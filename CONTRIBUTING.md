@@ -1,13 +1,20 @@
-# Panduan Kontribusi
+## 1. Mengambil Project ke Laptop
 
-## 1. Jangan bekerja langsung pada branch main
+Repository ini digunakan sebagai repository utama pengembangan Capstone Project.
 
-Gunakan branch sesuai jenis pekerjaan:
+Karena repository masih bersifat **private**, anggota harus:
+
+- memiliki akun GitHub;
+- telah ditambahkan sebagai collaborator;
+- menerima undangan repository sebelum melakukan clone.
+
+### 1.1 Persiapan Awal
+
+Minimal siapkan:
 
 ```text
-feature/*
-fix/*
-docs/*
-test/*
-refactor/*
-```
+Git
+GitHub Account
+VS Code
+Docker Desktop
+Node.js 24 LTS
