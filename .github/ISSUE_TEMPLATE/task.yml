@@ -1,0 +1,73 @@
+name: Project Task
+description: Buat tugas teknis, dokumentasi, desain, atau pengujian
+title: "[TASK] "
+body:
+  - type: textarea
+    id: objective
+    attributes:
+      label: Tujuan
+      description: Jelaskan tujuan pekerjaan ini
+      placeholder: Tugas ini bertujuan untuk...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Kategori
+      options:
+        - Analisis
+        - Database
+        - ERD
+        - DFD
+        - UML
+        - UI / UX
+        - Frontend
+        - Backend
+        - Testing
+        - Dokumentasi
+        - Deployment
+        - Release
+        - Lainnya
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Luaran
+      description: Hasil konkret yang harus dihasilkan
+      placeholder: |
+        Contoh:
+        - Diagram final
+        - Source code
+        - Dokumen
+        - Test result
+    validations:
+      required: true
+
+  - type: textarea
+    id: definition
+    attributes:
+      label: Definition of Done
+      description: Syarat agar tugas dapat dipindahkan ke DONE
+      placeholder: |
+        - [ ] Pekerjaan selesai
+        - [ ] Sudah direview
+        - [ ] Dokumentasi tersedia
+        - [ ] File sudah masuk repository / Drive
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Dokumentasi / Evidence
+      description: Tentukan bukti pengerjaan yang perlu disimpan
+      placeholder: |
+        Screenshot proses:
+        File hasil:
+        Link Google Drive:
+        Commit / Pull Request:
+    validations:
+      required: false

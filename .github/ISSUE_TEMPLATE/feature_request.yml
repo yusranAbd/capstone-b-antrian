@@ -1,0 +1,68 @@
+name: Feature Request
+description: Usulkan fitur baru atau peningkatan sistem
+title: "[FEATURE] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gunakan form ini untuk mengusulkan fitur baru atau peningkatan fitur yang sudah ada.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Masalah atau Kebutuhan
+      description: Jelaskan masalah yang ingin diselesaikan
+      placeholder: Pengguna membutuhkan...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Solusi yang Diusulkan
+      description: Jelaskan fitur atau perubahan yang diusulkan
+      placeholder: Sistem dapat...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area Sistem
+      options:
+        - Client Flutter
+        - Backend NestJS
+        - Basis Data
+        - Authentication / RBAC
+        - Reservasi
+        - Antrean
+        - QR Check-In
+        - Real-Time / Socket.IO
+        - Public Display
+        - Text-to-Speech
+        - Admin Dashboard
+        - Dokumentasi
+        - Deployment
+        - Lainnya
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: Kondisi yang harus terpenuhi agar fitur dianggap selesai
+      placeholder: |
+        - [ ] USER dapat...
+        - [ ] Sistem memvalidasi...
+        - [ ] Data tersimpan...
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Catatan Tambahan
+      description: Tambahkan referensi, mockup, atau informasi lain jika diperlukan
+    validations:
+      required: false

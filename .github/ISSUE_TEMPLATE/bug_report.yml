@@ -1,0 +1,101 @@
+name: Bug Report
+description: Laporkan masalah atau perilaku sistem yang tidak sesuai
+title: "[BUG] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Terima kasih telah melaporkan masalah.
+        Jelaskan bug secara jelas agar dapat direproduksi dan diperbaiki.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area Sistem
+      description: Bagian sistem yang mengalami masalah
+      options:
+        - Client Flutter
+        - Backend NestJS
+        - Basis Data
+        - Authentication / RBAC
+        - Reservasi
+        - Antrean
+        - QR Check-In
+        - Real-Time / Socket.IO
+        - Public Display
+        - Text-to-Speech
+        - Admin Dashboard
+        - Deployment
+        - Lainnya
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Deskripsi Masalah
+      description: Jelaskan apa yang terjadi
+      placeholder: Jelaskan bug secara singkat dan jelas.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Langkah Reproduksi
+      description: Langkah untuk memunculkan bug
+      placeholder: |
+        1. Login sebagai USER
+        2. Pilih layanan
+        3. Buat reservasi
+        4. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Hasil yang Diharapkan
+      placeholder: Sistem seharusnya...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Hasil Aktual
+      placeholder: Yang terjadi adalah...
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Lingkungan Pengujian
+      placeholder: |
+        Platform: Android / Web
+        Browser:
+        Device:
+        OS:
+        Branch:
+        Commit:
+    validations:
+      required: false
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Screenshot / Log
+      description: Tambahkan screenshot atau log jika tersedia
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: Saya sudah memastikan issue yang sama belum pernah dibuat
+          required: true
+        - label: Saya tidak menyertakan password, token, atau data sensitif
+          required: true
