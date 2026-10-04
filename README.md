@@ -8,9 +8,6 @@ Universitas Terbuka.
 
 🚧 Tahap Analisis dan Perancangan
 
-Implementasi final akan dilakukan setelah desain sistem
-dan hasil review proposal dikonfirmasi.
-
 ## Tujuan
 
 Mengembangkan sistem manajemen antrean digital untuk
