@@ -73,3 +73,6 @@ temp/
 *.pem
 *.p12
 *.pfx
+
+# TypeScript build cache
+*.tsbuildinfo
