@@ -30,6 +30,7 @@ describe('HealthController (e2e)', () => {
 
     expect(response.body.status).toBe('ok');
     expect(response.body.service).toBe('capstone-antrean-api');
+    expect(response.body.database).toBe('connected');
     expect(response.body.timestamp).toBeDefined();
   });
 });
