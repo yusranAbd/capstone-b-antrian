@@ -140,6 +140,10 @@ jobs:
             npm install
           fi
 
+      - name: Generate Prisma Client
+        working-directory: apps/api
+        run: npx prisma generate
+
       - name: Run lint
         run: npm run lint --if-present
 
