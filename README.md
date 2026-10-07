@@ -1,4 +1,4 @@
-# Capstone Project - Sistem Manajemen Antrean Digital
+# KELOMPOK B - Sistem Manajemen Antrean Digital
 
 Repository utama Capstone Project STSI4440
 Program Studi Sistem Informasi
