@@ -7,3 +7,258 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum PeranPengguna {
+  USER
+  PETUGAS
+  ADMIN
+
+  @@map("peran_pengguna")
+}
+
+enum StatusTiket {
+  DIPESAN
+  CHECK_IN
+  MENUNGGU
+  DIPANGGIL
+  DILAYANI
+  SELESAI
+  DILEWATI
+  DIBATALKAN
+
+  @@map("status_tiket")
+}
+
+enum HariLayanan {
+  SENIN
+  SELASA
+  RABU
+  KAMIS
+  JUMAT
+  SABTU
+  MINGGU
+
+  @@map("hari_layanan")
+}
+
+enum JenisNotifikasi {
+  INFORMASI
+  PENGINGAT
+  PEMANGGILAN
+  PERUBAHAN_STATUS
+
+  @@map("jenis_notifikasi")
+}
+
+model Pengguna {
+  id             String        @id @default(uuid()) @db.Uuid
+  nama           String        @db.VarChar(150)
+  email          String        @unique @db.VarChar(150)
+  kataSandiHash  String        @map("kata_sandi_hash") @db.VarChar(255)
+  peran          PeranPengguna
+  aktif          Boolean       @default(true)
+  dibuatPada     DateTime      @default(now()) @map("dibuat_pada") @db.Timestamptz(6)
+  diperbaruiPada DateTime      @updatedAt @map("diperbarui_pada") @db.Timestamptz(6)
+
+  tiketAntrean     TiketAntrean[]
+  penugasanPetugas PenugasanPetugas[]
+  peristiwaAntrean PeristiwaAntrean[]
+  sesiPengguna     SesiPengguna[]
+  notifikasi       Notifikasi[]
+
+  @@map("pengguna")
+}
+
+model Layanan {
+  id               String   @id @default(uuid()) @db.Uuid
+  kode             String   @unique @db.VarChar(20)
+  nama             String   @db.VarChar(150)
+  deskripsi        String?  @db.Text
+  prefixAntrean    String   @map("prefix_antrean") @db.VarChar(5)
+  durasiDasarMenit Int      @map("durasi_dasar_menit")
+  aktif            Boolean  @default(true)
+  dibuatPada       DateTime @default(now()) @map("dibuat_pada") @db.Timestamptz(6)
+  diperbaruiPada   DateTime @updatedAt @map("diperbarui_pada") @db.Timestamptz(6)
+
+  loket               Loket[]
+  jadwalLayanan       JadwalLayanan[]
+  tiketAntrean        TiketAntrean[]
+  urutanAntreanHarian UrutanAntreanHarian[]
+  perangkatTampilan   PerangkatTampilan[]
+
+  @@map("layanan")
+}
+
+model Loket {
+  id             String   @id @default(uuid()) @db.Uuid
+  layananId      String   @map("layanan_id") @db.Uuid
+  kode           String   @db.VarChar(20)
+  nama           String   @db.VarChar(100)
+  lokasi         String?  @db.VarChar(150)
+  aktif          Boolean  @default(true)
+  dibuatPada     DateTime @default(now()) @map("dibuat_pada") @db.Timestamptz(6)
+  diperbaruiPada DateTime @updatedAt @map("diperbarui_pada") @db.Timestamptz(6)
+
+  layanan          Layanan            @relation(fields: [layananId], references: [id])
+  tiketAntrean     TiketAntrean[]
+  penugasanPetugas PenugasanPetugas[]
+
+  @@unique([layananId, kode])
+  @@index([layananId])
+  @@map("loket")
+}
+
+model JadwalLayanan {
+  id              String      @id @default(uuid()) @db.Uuid
+  layananId       String      @map("layanan_id") @db.Uuid
+  hari            HariLayanan
+  jamBuka         DateTime    @map("jam_buka") @db.Time(0)
+  jamTutup        DateTime    @map("jam_tutup") @db.Time(0)
+  kapasitasHarian Int         @map("kapasitas_harian")
+  aktif           Boolean     @default(true)
+  dibuatPada      DateTime    @default(now()) @map("dibuat_pada") @db.Timestamptz(6)
+  diperbaruiPada  DateTime    @updatedAt @map("diperbarui_pada") @db.Timestamptz(6)
+
+  layanan Layanan @relation(fields: [layananId], references: [id])
+
+  @@unique([layananId, hari])
+  @@index([layananId])
+  @@map("jadwal_layanan")
+}
+
+model PenugasanPetugas {
+  id             String    @id @default(uuid()) @db.Uuid
+  petugasId      String    @map("petugas_id") @db.Uuid
+  loketId        String    @map("loket_id") @db.Uuid
+  tanggalMulai   DateTime  @map("tanggal_mulai") @db.Date
+  tanggalSelesai DateTime? @map("tanggal_selesai") @db.Date
+  aktif          Boolean   @default(true)
+  dibuatPada     DateTime  @default(now()) @map("dibuat_pada") @db.Timestamptz(6)
+
+  petugas Pengguna @relation(fields: [petugasId], references: [id])
+  loket   Loket    @relation(fields: [loketId], references: [id])
+
+  @@index([petugasId])
+  @@index([loketId])
+  @@index([tanggalMulai, tanggalSelesai])
+  @@map("penugasan_petugas")
+}
+
+model TiketAntrean {
+  id                   String      @id @default(uuid()) @db.Uuid
+  penggunaId           String      @map("pengguna_id") @db.Uuid
+  layananId            String      @map("layanan_id") @db.Uuid
+  loketId              String?     @map("loket_id") @db.Uuid
+  tanggalAntrean       DateTime    @map("tanggal_antrean") @db.Date
+  nomorUrut            Int         @map("nomor_urut")
+  kodeTiket            String      @unique @map("kode_tiket") @db.VarChar(30)
+  status               StatusTiket @default(DIPESAN)
+  tokenQrHash          String?     @unique @map("token_qr_hash") @db.VarChar(255)
+  qrKedaluwarsaPada    DateTime?   @map("qr_kedaluwarsa_pada") @db.Timestamptz(6)
+  checkInPada          DateTime?   @map("check_in_pada") @db.Timestamptz(6)
+  dipanggilPada        DateTime?   @map("dipanggil_pada") @db.Timestamptz(6)
+  pelayananDimulaiPada DateTime?   @map("pelayanan_dimulai_pada") @db.Timestamptz(6)
+  pelayananSelesaiPada DateTime?   @map("pelayanan_selesai_pada") @db.Timestamptz(6)
+  versi                Int         @default(1)
+  dibuatPada           DateTime    @default(now()) @map("dibuat_pada") @db.Timestamptz(6)
+  diperbaruiPada       DateTime    @updatedAt @map("diperbarui_pada") @db.Timestamptz(6)
+
+  pengguna         Pengguna           @relation(fields: [penggunaId], references: [id])
+  layanan          Layanan            @relation(fields: [layananId], references: [id])
+  loket            Loket?             @relation(fields: [loketId], references: [id])
+  peristiwaAntrean PeristiwaAntrean[]
+  notifikasi       Notifikasi[]
+
+  @@unique([layananId, tanggalAntrean, nomorUrut])
+  @@index([penggunaId])
+  @@index([layananId])
+  @@index([loketId])
+  @@index([tanggalAntrean, status])
+  @@map("tiket_antrean")
+}
+
+model UrutanAntreanHarian {
+  id             String   @id @default(uuid()) @db.Uuid
+  layananId      String   @map("layanan_id") @db.Uuid
+  tanggal        DateTime @db.Date
+  nomorTerakhir  Int      @default(0) @map("nomor_terakhir")
+  diperbaruiPada DateTime @updatedAt @map("diperbarui_pada") @db.Timestamptz(6)
+
+  layanan Layanan @relation(fields: [layananId], references: [id])
+
+  @@unique([layananId, tanggal])
+  @@index([layananId])
+  @@map("urutan_antrean_harian")
+}
+
+model PeristiwaAntrean {
+  id             String       @id @default(uuid()) @db.Uuid
+  tiketAntreanId String       @map("tiket_antrean_id") @db.Uuid
+  aktorId        String?      @map("aktor_id") @db.Uuid
+  tipe           String       @db.VarChar(50)
+  statusSebelum  StatusTiket? @map("status_sebelum")
+  statusSesudah  StatusTiket? @map("status_sesudah")
+  dataTambahan   Json?        @map("data_tambahan") @db.JsonB
+  versi          Int          @default(1)
+  terjadiPada    DateTime     @default(now()) @map("terjadi_pada") @db.Timestamptz(6)
+
+  tiketAntrean TiketAntrean @relation(fields: [tiketAntreanId], references: [id])
+  aktor        Pengguna?    @relation(fields: [aktorId], references: [id])
+
+  @@index([tiketAntreanId])
+  @@index([aktorId])
+  @@index([terjadiPada])
+  @@map("peristiwa_antrean")
+}
+
+model PerangkatTampilan {
+  id                String    @id @default(uuid()) @db.Uuid
+  layananId         String    @map("layanan_id") @db.Uuid
+  nama              String    @db.VarChar(100)
+  tokenHash         String    @unique @map("token_hash") @db.VarChar(255)
+  pengaturanAudio   Json?     @map("pengaturan_audio") @db.JsonB
+  aktif             Boolean   @default(true)
+  terakhirAktifPada DateTime? @map("terakhir_aktif_pada") @db.Timestamptz(6)
+  dibuatPada        DateTime  @default(now()) @map("dibuat_pada") @db.Timestamptz(6)
+  diperbaruiPada    DateTime  @updatedAt @map("diperbarui_pada") @db.Timestamptz(6)
+
+  layanan Layanan @relation(fields: [layananId], references: [id])
+
+  @@index([layananId])
+  @@map("perangkat_tampilan")
+}
+
+model SesiPengguna {
+  id               String    @id @default(uuid()) @db.Uuid
+  penggunaId       String    @map("pengguna_id") @db.Uuid
+  tokenRefreshHash String    @unique @map("token_refresh_hash") @db.VarChar(255)
+  namaPerangkat    String?   @map("nama_perangkat") @db.VarChar(150)
+  kedaluwarsaPada  DateTime  @map("kedaluwarsa_pada") @db.Timestamptz(6)
+  dicabutPada      DateTime? @map("dicabut_pada") @db.Timestamptz(6)
+  dibuatPada       DateTime  @default(now()) @map("dibuat_pada") @db.Timestamptz(6)
+
+  pengguna Pengguna @relation(fields: [penggunaId], references: [id])
+
+  @@index([penggunaId])
+  @@index([kedaluwarsaPada])
+  @@map("sesi_pengguna")
+}
+
+model Notifikasi {
+  id             String          @id @default(uuid()) @db.Uuid
+  penggunaId     String          @map("pengguna_id") @db.Uuid
+  tiketAntreanId String?         @map("tiket_antrean_id") @db.Uuid
+  jenis          JenisNotifikasi
+  judul          String          @db.VarChar(150)
+  pesan          String          @db.Text
+  dibacaPada     DateTime?       @map("dibaca_pada") @db.Timestamptz(6)
+  dibuatPada     DateTime        @default(now()) @map("dibuat_pada") @db.Timestamptz(6)
+
+  pengguna     Pengguna      @relation(fields: [penggunaId], references: [id])
+  tiketAntrean TiketAntrean? @relation(fields: [tiketAntreanId], references: [id])
+
+  @@index([penggunaId])
+  @@index([tiketAntreanId])
+  @@index([dibacaPada])
+  @@map("notifikasi")
+}
