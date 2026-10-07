@@ -76,3 +76,6 @@ temp/
 
 # TypeScript build cache
 *.tsbuildinfo
+
+# Prisma generated client
+apps/api/src/generated/prisma/
