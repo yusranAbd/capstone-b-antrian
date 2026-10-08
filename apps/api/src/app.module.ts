@@ -5,6 +5,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { validateEnvironment } from './config/env.validation';
 import { HealthModule } from './health/health.module';
+import { LayananModule } from './layanan/layanan.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { HealthModule } from './health/health.module';
 
     HealthModule,
     AuthModule,
+    LayananModule,
   ],
 })
 export class AppModule {}
