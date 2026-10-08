@@ -8,6 +8,11 @@ import { configureApp } from '../src/configure-app';
 import { PeranPengguna } from '../src/generated/prisma/client';
 import { PrismaService } from '../src/prisma/prisma.service';
 
+import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Roles } from '../src/auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../src/auth/guards/roles.guard';
+
 interface AuthResponse {
   accessToken: string;
   refreshToken: string;
@@ -25,6 +30,27 @@ interface RegisterResponse {
   email: string;
   peran: PeranPengguna;
   kataSandiHash?: string;
+}
+
+@Controller('__e2e/rbac')
+class RbacTestController {
+  @Get('petugas')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(PeranPengguna.PETUGAS, PeranPengguna.ADMIN)
+  cekPetugas() {
+    return {
+      message: 'Akses petugas diizinkan',
+    };
+  }
+
+  @Get('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(PeranPengguna.ADMIN)
+  cekAdmin() {
+    return {
+      message: 'Akses admin diizinkan',
+    };
+  }
 }
 
 describe('Authentication API (e2e)', () => {
@@ -74,6 +100,7 @@ describe('Authentication API (e2e)', () => {
 
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
+      controllers: [RbacTestController],
     }).compile();
 
     app = moduleRef.createNestApplication();
@@ -191,12 +218,12 @@ describe('Authentication API (e2e)', () => {
   it('membatasi akses USER, PETUGAS, dan ADMIN', async () => {
     // USER tidak mempunyai akses operasional.
     await request(httpServer())
-      .get('/api/v1/auth/cek-akses/petugas')
+      .get('/api/v1/__e2e/rbac/petugas')
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(403);
 
     await request(httpServer())
-      .get('/api/v1/auth/cek-akses/admin')
+      .get('/api/v1/__e2e/rbac/admin')
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(403);
 
@@ -209,12 +236,12 @@ describe('Authentication API (e2e)', () => {
 
       // JwtStrategy membaca role terbaru dari DB.
       await request(httpServer())
-        .get('/api/v1/auth/cek-akses/petugas')
+        .get('/api/v1/__e2e/rbac/petugas')
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
 
       await request(httpServer())
-        .get('/api/v1/auth/cek-akses/admin')
+        .get('/api/v1/__e2e/rbac/admin')
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(403);
 
@@ -225,12 +252,12 @@ describe('Authentication API (e2e)', () => {
       });
 
       await request(httpServer())
-        .get('/api/v1/auth/cek-akses/admin')
+        .get('/api/v1/__e2e/rbac/admin')
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
 
       await request(httpServer())
-        .get('/api/v1/auth/cek-akses/petugas')
+        .get('/api/v1/__e2e/rbac/petugas')
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
     } finally {
@@ -305,6 +332,11 @@ describe('Authentication API (e2e)', () => {
       message: 'Logout berhasil',
     });
 
+    await request(httpServer())
+      .get('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(401);
+
     const sesi = await database().sesiPengguna.findFirst({
       where: {
         penggunaId,
@@ -321,5 +353,29 @@ describe('Authentication API (e2e)', () => {
       .post('/api/v1/auth/refresh')
       .send({ refreshToken })
       .expect(401);
+  });
+
+  it('membatasi percobaan login berlebihan', async () => {
+    const statusCodes: number[] = [];
+
+    for (let i = 0; i < 6; i++) {
+      const response = await request(httpServer())
+        .post('/api/v1/auth/login')
+        .send({
+          email: 'akun-tidak-ada@test.local',
+          kataSandi: 'PasswordSalah123!',
+        });
+
+      statusCodes.push(response.status);
+    }
+
+    // Setiap request harus ditolak karena
+    // kredensial salah atau rate limit tercapai.
+    expect(
+      statusCodes.every((status) => status === 401 || status === 429),
+    ).toBe(true);
+
+    // Membuktikan throttling benar-benar aktif.
+    expect(statusCodes).toContain(429);
   });
 });

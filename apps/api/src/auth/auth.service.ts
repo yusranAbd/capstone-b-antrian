@@ -213,6 +213,7 @@ export class AuthService {
   }) {
     const accessPayload: AccessTokenPayload = {
       sub: params.userId,
+      sid: params.sessionId,
       email: params.email,
       role: params.role,
     };
