@@ -7,6 +7,7 @@ import { validateEnvironment } from './config/env.validation';
 import { HealthModule } from './health/health.module';
 import { LayananModule } from './layanan/layanan.module';
 import { LoketModule } from './loket/loket.module';
+import { JadwalLayananModule } from './jadwal-layanan/jadwal-layanan.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { LoketModule } from './loket/loket.module';
     AuthModule,
     LayananModule,
     LoketModule,
+    JadwalLayananModule,
   ],
 })
 export class AppModule {}
