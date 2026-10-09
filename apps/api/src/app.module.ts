@@ -8,7 +8,7 @@ import { HealthModule } from './health/health.module';
 import { LayananModule } from './layanan/layanan.module';
 import { LoketModule } from './loket/loket.module';
 import { JadwalLayananModule } from './jadwal-layanan/jadwal-layanan.module';
-
+import { PenugasanPetugasModule } from './penugasan-petugas/penugasan-petugas.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -29,6 +29,7 @@ import { JadwalLayananModule } from './jadwal-layanan/jadwal-layanan.module';
     LayananModule,
     LoketModule,
     JadwalLayananModule,
+    PenugasanPetugasModule,
   ],
 })
 export class AppModule {}
