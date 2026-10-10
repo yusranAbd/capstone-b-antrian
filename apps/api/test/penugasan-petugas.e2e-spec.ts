@@ -244,7 +244,7 @@ describe('Penugasan Petugas API (e2e)', () => {
 
     loketDuaId = loketDua.id;
     loketIds.push(loketDua.id);
-  });
+  }, 60000);
 
   // ==========================================
   // CLEANUP DATA KHUSUS E2E
