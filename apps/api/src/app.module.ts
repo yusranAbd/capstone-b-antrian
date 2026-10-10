@@ -11,6 +11,8 @@ import { JadwalLayananModule } from './jadwal-layanan/jadwal-layanan.module';
 import { PenugasanPetugasModule } from './penugasan-petugas/penugasan-petugas.module';
 import { ReservasiModule } from './reservasi/reservasi.module';
 import { TiketModule } from './tiket/tiket.module';
+import { QrModule } from './qr/qr.module';
+import { CheckInModule } from './check-in/check-in.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -34,6 +36,8 @@ import { TiketModule } from './tiket/tiket.module';
     PenugasanPetugasModule,
     ReservasiModule,
     TiketModule,
+    QrModule,
+    CheckInModule,
   ],
 })
 export class AppModule {}
