@@ -209,6 +209,7 @@ class _DoctorDashboardClockState extends State<DoctorDashboardClock> {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         OutlinedButton.icon(
+          key: const ValueKey('doctor-date-picker'),
           onPressed: widget.loading ? null : widget.onPickDate,
           style: OutlinedButton.styleFrom(
             backgroundColor: Colors.white,

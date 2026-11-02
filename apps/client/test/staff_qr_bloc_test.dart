@@ -186,12 +186,14 @@ void main() {
     ValueChanged<String>? detect;
     await tester.pumpWidget(
       MaterialApp(
-        home: StaffQrScanner(
-          onScan: (_) => Future.error(StateError('sensitive $staffQr')),
-          previewBuilder: (callback) {
-            detect = callback;
-            return const SizedBox();
-          },
+        home: Scaffold(
+          body: StaffQrScanner(
+            onScan: (_) => Future.error(StateError('sensitive $staffQr')),
+            previewBuilder: (callback) {
+              detect = callback;
+              return const SizedBox();
+            },
+          ),
         ),
       ),
     );

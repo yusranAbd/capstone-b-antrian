@@ -242,7 +242,11 @@ void main() {
     expect(stateText(c.state).contains(fixtureActivationCode), isFalse);
     expect(stateText(c.state).contains('fixture-secret'), isFalse);
     expect(stateText(c.state).contains('must-not-publish'), isFalse);
-    expect(f.reads, {adminDisplayPath: 1, '/layanan': 1});
+    expect(f.reads, {
+      adminDisplayPath: 1,
+      '/layanan': 1,
+      '/layanan/kesiapan': 1,
+    });
   });
   test('initial failure, verified empty, refresh failure with data and recovery are distinct', () async {
     f.readError = 503;

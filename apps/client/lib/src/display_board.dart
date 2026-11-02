@@ -42,11 +42,19 @@ class DisplayBoard extends StatelessWidget {
   List<Json> get rooms => rows(snapshot?['loket']);
 
   static ({Json room, Json ticket})? currentCall(Json? snapshot) {
-    final calls = <({Json room, Json ticket})>[
+    final active = <({Json room, Json ticket})>[
       for (final room in rows(snapshot?['loket']))
         for (final ticket in rows(room['tiketAktif']))
-          if (ticket['status'] == 'DIPANGGIL') (room: room, ticket: ticket),
+          if (ticket['status'] == 'DIPANGGIL' || ticket['status'] == 'DILAYANI')
+            (room: room, ticket: ticket),
     ];
+    // New calls take priority; START must not clear a still-active ticket.
+    final hasCall = active.any(
+      (entry) => entry.ticket['status'] == 'DIPANGGIL',
+    );
+    final calls = active
+        .where((entry) => !hasCall || entry.ticket['status'] == 'DIPANGGIL')
+        .toList();
     final announcement = object(snapshot?['pengumumanTerakhir']);
     for (final call in calls) {
       if (call.room['kode'] == announcement['kodeLoket'] &&
@@ -304,12 +312,14 @@ class DisplayBoard extends StatelessWidget {
   Widget _hero(double unit) {
     final visibleSnapshot = rejected ? null : snapshot;
     final call = currentCall(visibleSnapshot);
+    final serving = call?.ticket['status'] == 'DILAYANI';
     final announcement = object(visibleSnapshot?['pengumumanTerakhir']);
     final name = call?.ticket['namaPasien'];
     return QueueBValueMotion(
       value: (
         call?.room['kode'],
         call?.ticket['nomorAntrean'],
+        call?.ticket['status'],
         announcement['peristiwaId'],
       ),
       scope: (
@@ -342,7 +352,9 @@ class DisplayBoard extends StatelessWidget {
               Row(
                 children: [
                   Icon(
-                    Icons.campaign_outlined,
+                    serving
+                        ? Icons.medical_services_outlined
+                        : Icons.campaign_outlined,
                     color: Colors.white,
                     size: 48 * unit,
                   ),
@@ -360,6 +372,8 @@ class DisplayBoard extends StatelessWidget {
                       child: Text(
                         call == null
                             ? 'INFORMASI PANGGILAN'
+                            : serving
+                            ? 'SEDANG DILAYANI'
                             : 'SEDANG DIPANGGIL',
                         style: TextStyle(
                           fontSize: 30 * unit,

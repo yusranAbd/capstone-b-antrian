@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'portal_test_actions.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -9,7 +11,6 @@ import 'package:queueb_client/src/api.dart';
 import 'package:queueb_client/src/app.dart';
 import 'package:queueb_client/src/config.dart';
 import 'package:queueb_client/src/staff_v4.dart';
-import 'package:queueb_client/src/staff_ui.dart';
 
 import 'staff_v4_test.dart' show StaffV4Backend;
 import 'ui_test.dart' show uid;
@@ -99,23 +100,27 @@ void main() {
       (tester) async {
         final backend = CompactStaffBackend()..paged = true;
         await launch(tester, backend, size);
+        await tester.tap(find.byType(StaffScheduledDoctorSummary));
+        await tester.pumpAndSettle();
+        expect(find.text('Dokter terjadwal'), findsWidgets);
         expect(find.text('dr. Sekar Larasati, Sp.PD'), findsOneWidget);
+        await tester.tap(find.text('Tutup'));
+        await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
-        expect(find.byType(FloatingActionButton), findsOneWidget);
+        expect(find.text('Pindai QR'), findsOneWidget);
         expect(find.text('Input Manual'), findsNothing);
         expect(find.byKey(const ValueKey('staff-qr-panel')), findsNothing);
         if (size.width >= 1000) {
           final left = tester.getSize(find.byType(StaffPatientList)).width;
-          final service = find.byWidgetPredicate(
-            (w) => w is StaffPanel && w.title == 'Pelayanan ruang ini',
-          );
+          final service = find.byKey(const ValueKey('staff-service-panel'));
           final right = tester.getSize(service).width;
           expect(right / (left + right), greaterThan(.43));
           expect(
             tester.getBottomLeft(find.text('Pindai QR')).dy,
             lessThan(size.height),
           );
-          expect(find.text('Tindak lanjut: 1/2'), findsOneWidget);
+          await selectStaffQueueTab(tester, 'Tindak lanjut');
+          expect(find.byTooltip('Tindak lanjut berikutnya'), findsOneWidget);
         }
       },
     );
@@ -131,8 +136,8 @@ void main() {
       );
       for (final title
           in status == 'DIPANGGIL'
-              ? ['Panggil Ulang', 'Lewati', 'Mulai Pelayanan']
-              : ['Selesaikan Pelayanan']) {
+              ? ['Panggil Ulang', 'Tunda', 'Mulai Pelayanan']
+              : ['Selesaikan']) {
         final button = find.text(title);
         expect(button, findsOneWidget);
         expect(tester.getBottomLeft(button).dy, lessThan(720));
@@ -152,7 +157,7 @@ void main() {
         findsNothing,
       );
       expect(find.byTooltip('Keluar akun'), findsNothing);
-      await tester.tap(find.byTooltip('Profil petugas'));
+      await tester.tap(operationalProfileButton());
       await tester.pumpAndSettle();
       expect(find.text('Profil Saya'), findsOneWidget);
       final logout = find.text('Keluar Akun');

@@ -15,6 +15,7 @@ import 'package:queueb_client/src/app.dart';
 import 'package:queueb_client/src/config.dart';
 
 import 'ui_test.dart' show FakeBackend, uid;
+import 'portal_test_actions.dart';
 
 const roomB = '22222222-2222-4222-8222-222222222222';
 
@@ -249,19 +250,15 @@ void main() {
         expect(find.text('Pasien menunggu'), findsNothing);
         expect(find.text('Tiket diterima / dilewati'), findsNothing);
         if (size.width >= 1000) {
-          for (final name in ['UM-001', 'UM-002', 'UM-003', 'Pindai QR']) {
+          for (final name in ['UM-001', 'Pindai QR']) {
             expect(find.text(name), findsOneWidget);
             expect(t.getBottomLeft(find.text(name)).dy, lessThan(size.height));
           }
-          final scroll = t.state<ScrollableState>(
-            find
-                .descendant(
-                  of: find.byKey(const ValueKey('staff-page-scroll')),
-                  matching: find.byType(Scrollable),
-                )
-                .first,
-          );
-          expect(scroll.position.maxScrollExtent, 0);
+          await selectStaffQueueTab(t, 'Tindak lanjut');
+          for (final name in ['UM-002', 'UM-003']) {
+            expect(find.text(name), findsOneWidget);
+            expect(t.getBottomLeft(find.text(name)).dy, lessThan(size.height));
+          }
         }
         expect(t.takeException(), isNull);
       },
@@ -272,9 +269,10 @@ void main() {
     (t) async {
       final backend = StaffV4Backend();
       await launch(t, backend, const Size(1366, 768));
+      await selectStaffQueueTab(t, 'Tindak lanjut');
       final search = find.widgetWithText(
         TextField,
-        'Cari nomor antrean atau nama pasien',
+        'Cari nomor antrean atau nama pasien…',
       );
       await t.enterText(search, 'Budi');
       await t.pumpAndSettle();
@@ -286,6 +284,8 @@ void main() {
       await t.tap(find.text('Kembalikan ke Antrean'));
       await t.pumpAndSettle();
       expect(backend.patients[1]['status'], 'MENUNGGU');
+      await dismissFeedback(t);
+      await selectStaffQueueTab(t, 'Menunggu');
       expect(find.text('UM-002'), findsOneWidget);
       expect(find.text('Dilewati'), findsNothing);
       expect(t.widget<TextField>(search).controller!.text, 'Budi');
@@ -298,11 +298,14 @@ void main() {
       );
       await t.enterText(search, '');
       await t.pumpAndSettle();
+      await selectStaffQueueTab(t, 'Tindak lanjut');
       await t.tap(find.byTooltip('Aksi UM-003'));
       await t.pumpAndSettle();
       await t.tap(find.text('Masuk Antrean'));
       await t.pumpAndSettle();
       expect(backend.patients[2]['status'], 'MENUNGGU');
+      await dismissFeedback(t);
+      await selectStaffQueueTab(t, 'Menunggu');
       expect(find.text('UM-003'), findsOneWidget);
       expect(t.takeException(), isNull);
     },
@@ -313,6 +316,7 @@ void main() {
       final backend = StaffV4Backend();
       backend.patients[1]['bisaAntreUlang'] = false;
       await launch(t, backend, const Size(1366, 768));
+      await selectStaffQueueTab(t, 'Tindak lanjut');
       await t.tap(find.byTooltip('Aksi UM-002'));
       await t.pumpAndSettle();
       expect(find.text('Kembalikan ke Antrean'), findsNothing);
@@ -320,9 +324,9 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.text('Tutup'));
       await t.pumpAndSettle();
-      await t.tap(find.text('Ruang Umum · Poli Umum'));
+      await t.tap(find.text('RU · Ruang Umum – Poli Umum'));
       await t.pumpAndSettle();
-      await t.tap(find.text('Ruang Dua · Poli Umum').last);
+      await t.tap(find.text('RU2 · Ruang Dua – Poli Umum').last);
       await t.pumpAndSettle();
       expect(find.text('dr. Dokter Ruang Dua'), findsOneWidget);
       expect(find.text('dr. Sindi Fixture'), findsNothing);
@@ -349,9 +353,10 @@ void main() {
     expect(find.text('UM-23'), findsNothing);
     await t.tap(find.byTooltip('Halaman antrean berikutnya'));
     await t.pumpAndSettle();
-    expect(find.textContaining('halaman 2/'), findsOneWidget);
+    final pages = find.widgetWithText(FilledButton, '2');
+    expect(pages, findsOneWidget);
     backend.empty = true;
-    await t.tap(find.byTooltip('Muat ulang antrean'));
+    await t.tap(find.byTooltip('Muat ulang penugasan dan antrean'));
     await t.pumpAndSettle();
     expect(find.text('Belum ada antrean yang sesuai.'), findsOneWidget);
     expect(t.takeException(), isNull);
@@ -366,9 +371,9 @@ void main() {
       if (!gate.isCompleted) gate.complete(backend.reply([]));
     });
     await launch(t, backend, const Size(1366, 768));
-    await t.tap(find.text('Ruang Umum · Poli Umum'));
+    await t.tap(find.text('RU · Ruang Umum – Poli Umum'));
     await t.pumpAndSettle();
-    await t.tap(find.text('Ruang Dua · Poli Umum').last);
+    await t.tap(find.text('RU2 · Ruang Dua – Poli Umum').last);
     await t.pumpAndSettle();
     expect(find.text('dr. Dokter Ruang Dua'), findsOneWidget);
     gate.complete(
@@ -404,6 +409,7 @@ void main() {
         backend.requests.where((r) => r.$2 == '/queue/snapshot').length,
         greaterThan(count),
       );
+      await selectStaffQueueTab(t, 'Tindak lanjut');
       expect(find.text('Dilewati'), findsNWidgets(2));
       expect(find.text('UM-001'), findsOneWidget);
       for (final state in [
@@ -434,15 +440,12 @@ void main() {
   ) async {
     final backend = StaffV4Backend()..schedulesEmpty = true;
     await launch(t, backend, const Size(1366, 768));
-    expect(
-      find.text('Tidak ada jadwal dokter untuk ruang dan tanggal ini.'),
-      findsOneWidget,
-    );
+    expect(find.text('Tidak ada jadwal'), findsOneWidget);
     expect(find.text('UM-001'), findsOneWidget);
     expect(
       t
           .widget<FilledButton>(
-            find.widgetWithText(FilledButton, 'Panggil berikutnya'),
+            find.widgetWithText(FilledButton, 'Panggil Berikutnya'),
           )
           .onPressed,
       isNotNull,
@@ -455,14 +458,14 @@ void main() {
       await launch(t, backend, const Size(1366, 768));
       expect(find.text('Andi Pratama'), findsOneWidget);
       backend.denied = true;
-      await t.tap(find.byTooltip('Muat ulang antrean'));
+      await t.tap(find.byTooltip('Muat ulang penugasan dan antrean'));
       await t.pumpAndSettle();
       expect(find.text('Andi Pratama'), findsNothing);
       expect(find.text('dr. Sindi Fixture'), findsNothing);
       expect(
         t
             .widget<FilledButton>(
-              find.widgetWithText(FilledButton, 'Panggil berikutnya'),
+              find.widgetWithText(FilledButton, 'Panggil Berikutnya'),
             )
             .onPressed,
         isNull,
@@ -474,6 +477,7 @@ void main() {
     (t) async {
       final backend = StaffV4Backend()..paged = true;
       await launch(t, backend, const Size(1366, 768));
+      await selectStaffQueueTab(t, 'Tindak lanjut');
       await t.tap(find.byTooltip('Tindak lanjut berikutnya'));
       await t.pumpAndSettle();
       expect(find.text('UM-101'), findsOneWidget);
@@ -496,8 +500,10 @@ void main() {
       );
       // The refreshed waiting list is virtualized; locate the recovered row
       // through the same number search used by staff, including after reorder.
+      await dismissFeedback(t);
+      await selectStaffQueueTab(t, 'Menunggu');
       await t.enterText(
-        find.widgetWithText(TextField, 'Cari nomor antrean atau nama pasien'),
+        find.widgetWithText(TextField, 'Cari nomor antrean atau nama pasien…'),
         'UM-101',
       );
       await t.pumpAndSettle();

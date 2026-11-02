@@ -61,7 +61,7 @@ void main() {
       },
   ];
   testWidgets(
-    'direct navigation exposes all backed modules without category accordions',
+    'grouped navigation exposes every backed module without hiding actions in accordions',
     (tester) async {
       int selected = -1;
       await tester.pumpWidget(
@@ -71,15 +71,15 @@ void main() {
           ),
         ),
       );
-      expect(find.text('Master data'), findsNothing);
+      expect(find.text('Master Data'), findsOneWidget);
       expect(find.byType(ExpansionTile), findsNothing);
-      expect(find.byType(ListTile), findsNWidgets(11));
-      expect(find.text('Dokter'), findsOneWidget);
-      expect(find.text('Slot konsultasi'), findsOneWidget);
-      await tester.tap(find.text('Slot konsultasi'));
-      expect(selected, 5);
-      await tester.tap(find.text('Dokter'));
-      expect(selected, 1);
+      for (var index = -1; index < 10; index++) {
+        final item = find.text(adminSectionTitle(index));
+        await tester.scrollUntilVisible(item, 120);
+        await tester.tap(item);
+        expect(selected, index);
+      }
+      expect(find.text('Laporan & Aktivitas'), findsOneWidget);
     },
   );
   testWidgets(

@@ -34,6 +34,7 @@ class AdminDashboard extends StatelessWidget {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, box) {
       final desktop =
+          box.hasBoundedHeight &&
           box.maxWidth >= 960 &&
           box.maxHeight >=
               520 * (MediaQuery.textScalerOf(context).scale(14) / 14) &&
@@ -128,6 +129,10 @@ class AdminDashboard extends StatelessWidget {
         );
       }
       return ListView(
+        shrinkWrap: !box.hasBoundedHeight,
+        physics: box.hasBoundedHeight
+            ? null
+            : const NeverScrollableScrollPhysics(),
         padding: EdgeInsets.all(box.maxWidth < 360 ? 12 : 16),
         children: [
           welcome,
@@ -164,6 +169,7 @@ class AdminDashboard extends StatelessWidget {
         children: [
           for (final item in entries)
             SizedBox(
+              key: ValueKey('admin-metric-${item.$2}'),
               width: (box.maxWidth - 12 * (columns - 1)) / columns,
               child: _MasterMetric(
                 title: item.$1,
@@ -202,7 +208,7 @@ class AdminDashboard extends StatelessWidget {
       final rowHeight = height == null
           ? 58.0
           : ((height - 40 - footer) / visibleRows).clamp(48.0, 76.0).toDouble();
-      if (!catalog.containsKey('/layanan'))
+      if (!catalog.containsKey('/layanan')) {
         return const Center(
           child: Padding(
             padding: EdgeInsets.all(20),
@@ -212,7 +218,8 @@ class AdminDashboard extends StatelessWidget {
             ),
           ),
         );
-      if (clinics.isEmpty)
+      }
+      if (clinics.isEmpty) {
         return const Center(
           child: Padding(
             padding: EdgeInsets.all(20),
@@ -222,6 +229,7 @@ class AdminDashboard extends StatelessWidget {
             ),
           ),
         );
+      }
       return Theme(
         data: Theme.of(context).copyWith(
           cardTheme: const CardThemeData(
@@ -509,47 +517,62 @@ class _DashboardSection extends StatelessWidget {
   final String? subtitle;
   final Widget? action;
   @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Container(
-        padding: const EdgeInsets.all(9),
-        decoration: BoxDecoration(
-          color: AdminStyle.sky,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(icon, color: const Color(0xff3654d5), size: 23),
-      ),
-      const SizedBox(width: 10),
-      Expanded(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
-                height: 1.2,
-                fontWeight: FontWeight.w800,
-                color: Color(0xff101e4a),
-              ),
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, box) {
+      final stacked =
+          box.maxWidth < 360 && MediaQuery.textScalerOf(context).scale(14) > 20;
+      final heading = Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(9),
+            decoration: BoxDecoration(
+              color: AdminStyle.sky,
+              borderRadius: BorderRadius.circular(12),
             ),
-            if (subtitle != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                subtitle!,
-                style: const TextStyle(
-                  fontSize: 11,
-                  height: 1.3,
-                  color: QueueBStyle.muted,
+            child: Icon(icon, color: const Color(0xff3654d5), size: 23),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    height: 1.2,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xff101e4a),
+                  ),
                 ),
-              ),
-            ],
+                if (subtitle != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle!,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      height: 1.3,
+                      color: QueueBStyle.muted,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (action != null && !stacked) ...[
+            const SizedBox(width: 8),
+            action!,
           ],
-        ),
-      ),
-      if (action != null) ...[const SizedBox(width: 8), action!],
-    ],
+        ],
+      );
+      return stacked && action != null
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [heading, const SizedBox(height: 8), action!],
+            )
+          : heading;
+    },
   );
 }
 

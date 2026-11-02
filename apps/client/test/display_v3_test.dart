@@ -101,7 +101,7 @@ void main() {
       ),
     );
     await render();
-    expect(find.text('Antrian pasien'), findsOneWidget);
+    expect(find.text('Antrean pasien'), findsOneWidget);
     expect(find.text('STATUS'), findsOneWidget);
     expect(find.text('Pasien Demonstrasi Lengkap'), findsOneWidget);
     expect(find.text('Pasien Terlewat Lengkap'), findsOneWidget);
@@ -228,7 +228,7 @@ void main() {
             );
 
             if (count == 0) {
-              expect(find.text('Belum ada antrian pasien.'), findsOneWidget);
+              expect(find.text('Belum ada antrean pasien.'), findsOneWidget);
             }
             if (count == 30) {
               expect(
@@ -286,9 +286,12 @@ void main() {
       await render(monitorSnapshot(waiting: 1));
       expect(find.text('AN-002'), findsOneWidget);
       await render(monitorSnapshot(waiting: 0, status: 'DILAYANI'));
-      expect(find.byKey(const ValueKey('display-call-name')), findsNothing);
+      expect(find.byKey(const ValueKey('display-call-name')), findsOneWidget);
+      expect(find.text('AN-001'), findsOneWidget);
+      expect(find.text('Pasien D.'), findsOneWidget);
       expect(find.text('AN-002'), findsNothing);
-      expect(find.textContaining('Sedang dilayani'), findsOneWidget);
+      expect(find.text('SEDANG DILAYANI'), findsOneWidget);
+      expect(find.text('SEDANG DIPANGGIL'), findsNothing);
       await render(monitorSnapshot(waiting: 0, status: 'SELESAI'));
       expect(find.text('AN-001'), findsNothing);
       expect(find.text('Belum ada nomor dipanggil.'), findsOneWidget);

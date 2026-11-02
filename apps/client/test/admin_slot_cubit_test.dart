@@ -183,7 +183,13 @@ void main() {
       expect(c.state.load, SlotLoadStatus.loaded);
       expect(c.state.hasLoaded, isTrue);
       expect(c.state.slots.single['id'], 'slot-a');
-      expect(f.calls.last.url.queryParameters, {'jadwalPraktikId': 'a'});
+      expect(
+        f.calls
+            .singleWhere((r) => r.url.path == '/api/v1/slot-praktik')
+            .url
+            .queryParameters,
+        {'jadwalPraktikId': 'a'},
+      );
       expect(() => c.state.slots.clear(), throwsUnsupportedError);
       expect(
         () => c.state.slots.single['nested']['values'].add(2),

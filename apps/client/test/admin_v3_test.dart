@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'admin_metric_helpers.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -139,8 +141,12 @@ void main() {
     'failed catalog shows unavailable metrics rather than fabricated zero totals',
     (tester) async {
       await open(tester, fail: true);
-      expect(find.text('—'), findsNWidgets(4));
-      expect(find.text('Data belum tersedia'), findsNWidgets(4));
+      expectUnknownMasterMetrics([
+        '/layanan',
+        '/dokter',
+        '/loket',
+        '/jadwal-praktik',
+      ]);
       expect(
         find.text(
           'Layanan sedang mengalami gangguan. Muat ulang data dan coba lagi nanti.',

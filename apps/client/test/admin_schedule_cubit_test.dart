@@ -248,7 +248,14 @@ void main() {
           f.readGate = null;
           gate.complete();
           await Future.wait([first, ...pending]);
-          expect(f.calls.length, 2);
+          expect(
+            f.calls.where((r) => r.url.path == '/api/v1$path'),
+            hasLength(2),
+          );
+          expect(
+            f.calls.where((r) => r.url.path == '/api/v1/layanan/kesiapan'),
+            hasLength(2),
+          );
           expect(c.rows.single['id'], 'latest');
           await c.close();
         },

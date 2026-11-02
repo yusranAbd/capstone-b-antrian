@@ -292,7 +292,13 @@ class StaffScheduledDoctors extends StatelessWidget {
                 final horizontal =
                     (box.maxWidth - (columns - 1) * 16) / columns >= 540;
                 final scale = MediaQuery.textScalerOf(context).scale(12) / 12;
-                final rowHeight = (horizontal ? 74.0 : 116.0) * scale;
+                final rowHeight =
+                    (horizontal
+                        ? 74.0
+                        : box.maxWidth < 320
+                        ? 156.0
+                        : 116.0) *
+                    scale;
                 final visibleRows =
                     ((schedules.length + columns - 1) ~/ columns).clamp(1, 2);
                 return SizedBox(

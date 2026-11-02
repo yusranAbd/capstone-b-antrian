@@ -102,8 +102,9 @@ class _QueueBFeedbackHostState extends State<QueueBFeedbackHost> {
       widget.navigation.addListener(_scopeChanged);
     }
     if (oldWidget.navigatorKey != widget.navigatorKey ||
-        oldWidget.session != widget.session)
+        oldWidget.session != widget.session) {
       _clear();
+    }
     _scopeChanged();
   }
 
@@ -135,12 +136,14 @@ class _QueueBFeedbackHostState extends State<QueueBFeedbackHost> {
   void offer(_FeedbackItem item) {
     if (!mounted) return;
     _scopeChanged();
-    if (current?.sameAs(item) == true || pending.any((p) => p.sameAs(item)))
+    if (current?.sameAs(item) == true || pending.any((p) => p.sameAs(item))) {
       return;
+    }
     if (recent?.sameAs(item) == true &&
         recentAt != null &&
-        DateTime.now().difference(recentAt!) < const Duration(seconds: 2))
+        DateTime.now().difference(recentAt!) < const Duration(seconds: 2)) {
       return;
+    }
     if (current != null) {
       if (pending.length >= 4) pending.removeFirst();
       pending.add(item);
@@ -156,11 +159,12 @@ class _QueueBFeedbackHostState extends State<QueueBFeedbackHost> {
     recentAt = DateTime.now();
     revision++;
     _render();
-    if (!MediaQuery.accessibleNavigationOf(context))
+    if (!MediaQuery.accessibleNavigationOf(context)) {
       timer = Timer(
         Duration(seconds: item.kind == QueueBFeedbackKind.error ? 8 : 5),
         dismiss,
       );
+    }
   }
 
   void _render() {
@@ -174,8 +178,9 @@ class _QueueBFeedbackHostState extends State<QueueBFeedbackHost> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted &&
             current != null &&
-            widget.navigatorKey.currentState?.overlay != null)
+            widget.navigatorKey.currentState?.overlay != null) {
           _render();
+        }
       });
       return;
     }
@@ -395,9 +400,10 @@ class _QueueBPopupNoticeState extends State<QueueBPopupNotice> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted ||
           request != revision ||
-          !TickerMode.of(context) ||
-          ModalRoute.of(context)?.isCurrent == false)
+          !TickerMode.valuesOf(context).enabled ||
+          ModalRoute.of(context)?.isCurrent == false) {
         return;
+      }
       QueueBFeedback.show(context, widget.text, kind: widget.kind);
     });
   }

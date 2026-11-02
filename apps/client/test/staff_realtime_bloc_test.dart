@@ -292,13 +292,13 @@ void main() {
       expect(find.text('Dokter room-a'), findsOneWidget);
       final count = f.api.calls.length;
       await tester.enterText(
-        find.widgetWithText(TextField, 'Cari nomor antrean atau nama pasien'),
+        find.widgetWithText(TextField, 'Cari nomor antrean atau nama pasien…'),
         'U-',
       );
       await tester.pumpAndSettle();
       expect(f.api.calls.length, count);
       expect(f.feedCount, 1);
-      await tester.tap(find.byKey(const ValueKey('staff-scan-fab')));
+      await tester.tap(find.text('Pindai QR'));
       await tester.pumpAndSettle();
       expect(find.byType(StaffQrScanner), findsOneWidget);
       await tester.runAsync(() => f.api.clearSession());

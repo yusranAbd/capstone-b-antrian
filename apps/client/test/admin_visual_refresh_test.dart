@@ -122,7 +122,7 @@ void main() {
     },
   );
   testWidgets(
-    'Dashboard sidebar exposes direct modules without category controls',
+    'Dashboard sidebar groups modules while retaining direct navigation',
     (tester) async {
       var selected = -1;
       await tester.pumpWidget(
@@ -138,10 +138,10 @@ void main() {
       expect(find.text('Slot konsultasi'), findsOneWidget);
       await tester.scrollUntilVisible(find.text('Manajemen Display'), 150);
       expect(find.text('Manajemen Display'), findsOneWidget);
-      expect(find.text('Master data'), findsNothing);
-      expect(find.text('Manajemen jadwal'), findsNothing);
-      expect(find.text('Operasional'), findsNothing);
+      expect(find.text('Operasional'), findsOneWidget);
+      expect(find.text('Laporan & Aktivitas'), findsOneWidget);
       expect(find.byType(ExpansionTile), findsNothing);
+      await tester.scrollUntilVisible(find.text('Dokter'), -150);
       await tester.tap(find.text('Dokter'));
       expect(selected, 1);
     },

@@ -106,6 +106,7 @@ void main() {
       expect(sent.single, {
         'kode': 'NEURO',
         'nama': 'Saraf (Neurologi)',
+        'kategori': 'POLIKLINIK',
         'deskripsi': null,
         'prefixAntrean': 'SF',
         'durasiDasarMenit': 25,

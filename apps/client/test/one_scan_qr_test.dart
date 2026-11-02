@@ -152,7 +152,7 @@ void main() {
   );
   for (final size in [const Size(1366, 768), const Size(375, 900)]) {
     testWidgets(
-      'native scan FAB opens camera; server check-in refreshes snapshot $size',
+      'native scan button opens camera; server check-in refreshes snapshot $size',
       (tester) async {
         tester.view.physicalSize = size;
         tester.view.devicePixelRatio = 1;
@@ -175,7 +175,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        final fab = find.byType(FloatingActionButton);
+        final fab = find.text('Pindai QR');
         expect(fab, findsOneWidget);
         expect(find.byKey(const ValueKey('staff-qr-panel')), findsNothing);
         expect(find.text('Input Manual'), findsNothing);
@@ -183,6 +183,7 @@ void main() {
           find.widgetWithText(TextField, 'Payload QR (SQ1…)'),
           findsNothing,
         );
+        await tester.ensureVisible(fab);
         await tester.tap(fab);
         await tester.pumpAndSettle();
         final scanner = tester.widget<StaffQrScanner>(
@@ -210,6 +211,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byType(StaffQrScanner), findsNothing);
         expect(find.text('Pasien Uji'), findsOneWidget);
+        await tester.ensureVisible(fab);
         await tester.tap(fab);
         await tester.pumpAndSettle();
         expect(find.byType(StaffQrScanner), findsOneWidget);

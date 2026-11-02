@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import 'portal_test_actions.dart';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
 import 'package:http/http.dart' as http;
@@ -114,6 +117,7 @@ void main() {
             findsOneWidget,
           );
           backend.failHours = false;
+          await dismissFeedback(t);
           await t.tap(find.byTooltip('Muat ulang informasi'));
           await t.pumpAndSettle();
           expect(

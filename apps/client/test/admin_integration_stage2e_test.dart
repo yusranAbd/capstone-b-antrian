@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'admin_metric_helpers.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -152,8 +154,7 @@ void main() {
           ),
         ),
       );
-      expect(find.text('Data belum tersedia'), findsNWidgets(3));
-      expect(find.text('—'), findsNWidgets(3));
+      expectUnknownMasterMetrics(['/dokter', '/loket', '/jadwal-praktik']);
       expect(find.text('0 aktif'), findsNothing);
       expect(f.calls, isEmpty);
     },
@@ -288,7 +289,12 @@ void main() {
       f.readError = 503;
       await open(tester);
       expect(find.byType(AdminDashboard), findsOneWidget);
-      expect(find.text('Data belum tersedia'), findsNWidgets(4));
+      expectUnknownMasterMetrics([
+        '/layanan',
+        '/dokter',
+        '/loket',
+        '/jadwal-praktik',
+      ]);
       f.readError = null;
       tester.widget<AdminDashboard>(find.byType(AdminDashboard)).onRefresh!();
       await tester.pumpAndSettle();

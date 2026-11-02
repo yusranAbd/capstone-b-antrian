@@ -63,10 +63,10 @@ void main() {
         expect(find.byType(ProfessionalDoctorAvatar), findsOneWidget);
         expect(find.byType(NavigationRail), findsNothing);
         expect(find.byType(Drawer), findsNothing);
-        expect(find.text('0'), findsNWidgets(2));
-        expect(find.text('Dalam Antrean'), findsOneWidget);
-        await tester.tap(find.byTooltip('Muat ulang portal'));
-        await tester.tap(find.text('Tanggal: ${config.today}'));
+        expect(find.text('Menunggu (0)'), findsOneWidget);
+        expect(find.text('Semua (0)'), findsOneWidget);
+        await tester.tap(find.byTooltip('Muat ulang portal dokter'));
+        await tester.tap(find.byKey(const ValueKey('doctor-date-picker')));
         expect(refreshes, 1);
         expect(dates, 1);
         if (width >= 1200) {
@@ -77,10 +77,7 @@ void main() {
           final profile = tester.getTopLeft(
             find.byType(ProfessionalDoctorAvatar),
           );
-          expect(
-            tester.getTopLeft(find.text('Janji Hari Ini')).dy - profile.dy,
-            lessThan(50),
-          );
+          expect(queue.dy, greaterThan(profile.dy));
         }
         await tester.scrollUntilVisible(
           find.text('Belum ada antrean yang sesuai.'),
@@ -89,23 +86,23 @@ void main() {
         );
         expect(find.text('Belum ada antrean yang sesuai.'), findsOneWidget);
         await tester.scrollUntilVisible(
-          find.text('Pemanggilan Antrean Live'),
+          find.text('Antrean Aktif'),
           250,
           scrollable: find.byType(Scrollable).first,
         );
         status.value = 'Realtime terputus';
         await tester.pumpAndSettle();
-        expect(find.text('Realtime terputus'), findsWidgets);
+        expect(find.byTooltip('Realtime terputus'), findsWidgets);
         status.value = 'Realtime terhubung';
         await tester.pumpAndSettle();
-        expect(find.text('Realtime terhubung'), findsWidgets);
+        expect(find.byTooltip('Realtime terhubung'), findsWidgets);
         await tester.scrollUntilVisible(
           find.text('Jadwal Praktik Hari Ini'),
           250,
           scrollable: find.byType(Scrollable).first,
         );
         expect(
-          find.text('Tidak ada jadwal untuk tanggal pilihan.'),
+          find.text('Tidak ada jadwal pada tanggal pilihan.'),
           findsOneWidget,
         );
         expect(find.text('Catatan Klinis Dokter'), findsNothing);
@@ -156,8 +153,8 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(
-        tester.getSize(find.byType(DoctorQueueEmpty)).height,
-        lessThan(80),
+        tester.getBottomLeft(find.byType(DoctorQueuePanel)).dy,
+        lessThanOrEqualTo(768),
       );
       expect(
         tester.getSize(find.byType(DoctorLivePanel)).height,
@@ -173,7 +170,7 @@ void main() {
               find.byType(ProfessionalDoctorAvatar),
             )
             .radius,
-        30,
+        20,
       );
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());

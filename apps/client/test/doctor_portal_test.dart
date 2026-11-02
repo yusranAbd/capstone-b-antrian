@@ -122,8 +122,8 @@ void main() {
             ..accessToken = 'access';
       await tester.pumpWidget(QueueBApp(api: api));
       await tester.pumpAndSettle();
-      expect(find.text('Dashboard Dokter'), findsOneWidget);
-      expect(find.text('Dokter Satu'), findsWidgets);
+      expect(find.textContaining('Selamat datang,'), findsOneWidget);
+      expect(find.text('Selamat datang, Dokter Satu'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.text('M-001'),
         300,
@@ -132,7 +132,7 @@ void main() {
       expect(find.text('M-001'), findsOneWidget);
       expect(find.byType(NavigationBar), findsNothing);
       expect(find.text('M-002'), findsWidgets);
-      expect(find.text('Dalam Antrean'), findsOneWidget);
+      expect(find.text('Daftar Antrean Poli'), findsOneWidget);
       expect(find.text('Panggil berikutnya'), findsNothing);
       expect(find.text('Check-In QR'), findsNothing);
       expect(requests.every((m) => m == 'GET'), true);
@@ -173,24 +173,21 @@ void main() {
       findsOneWidget,
     );
     fail = false;
-    await tester.tap(find.byTooltip('Muat ulang portal'));
+    await tester.tap(find.byTooltip('Muat ulang portal dokter'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
-      find.text('Tidak ada jadwal untuk tanggal pilihan.'),
+      find.text('Tidak ada jadwal pada tanggal pilihan.'),
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(
-      find.text('Tidak ada jadwal untuk tanggal pilihan.'),
-      findsOneWidget,
-    );
+    expect(find.text('Tidak ada jadwal pada tanggal pilihan.'), findsOneWidget);
     await tester.scrollUntilVisible(
-      find.textContaining('Monitoring tersedia selama sesi'),
+      find.text('Monitoring tersedia saat sesi praktik aktif.'),
       -300,
       scrollable: find.byType(Scrollable).first,
     );
     expect(
-      find.textContaining('Monitoring tersedia selama sesi'),
+      find.text('Monitoring tersedia saat sesi praktik aktif.'),
       findsOneWidget,
     );
     expect(dates.whereType<String>().every((d) => d == config.today), true);

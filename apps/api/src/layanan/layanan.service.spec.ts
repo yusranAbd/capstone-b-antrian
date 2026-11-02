@@ -2,6 +2,7 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 
 import {
+  KategoriLayanan,
   ModeReservasi,
   PeranPengguna,
   Prisma,
@@ -102,6 +103,7 @@ describe('LayananService', () => {
         data: {
           kode: 'ADM2',
           nama: 'Administrasi Tambahan',
+          kategori: KategoriLayanan.POLIKLINIK,
           deskripsi: 'Layanan untuk pengujian.',
           prefixAntrean: 'B',
           durasiDasarMenit: 20,

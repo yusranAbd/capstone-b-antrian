@@ -261,14 +261,20 @@ void main() {
       waiting.add(c.refresh(paths: ['/layanan']));
     }
     await Future<void>.delayed(Duration.zero);
-    expect(f.requests.length, 1);
+    expect(
+      f.requests.where((r) => r.url.path == '/api/v1/layanan'),
+      hasLength(1),
+    );
     f.data['/layanan'] = [
       {'id': 'new', 'nama': 'Latest'},
     ];
     f.readBarrier = null;
     barrier.complete();
     await Future.wait([pending, ...waiting]);
-    expect(f.requests.length, 2);
+    expect(
+      f.requests.where((r) => r.url.path == '/api/v1/layanan'),
+      hasLength(2),
+    );
     expect(c.rows.single['nama'], 'Latest');
     await c.close();
   });

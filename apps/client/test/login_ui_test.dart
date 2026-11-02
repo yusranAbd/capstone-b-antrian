@@ -1,4 +1,7 @@
 import 'dart:async';
+
+import 'portal_test_actions.dart';
+
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -119,7 +122,7 @@ void main() {
       );
       expect(scroll.position.maxScrollExtent, 0);
       expect(
-        tester.getBottomRight(find.text('Pasien baru? Daftar')).dy,
+        tester.getBottomRight(find.text('Pasien baru?  Daftar')).dy,
         lessThan(size.height),
       );
       expect(find.text('Lupa kata sandi?'), findsNothing);
@@ -128,7 +131,7 @@ void main() {
       await press(tester, submit);
       expect(find.text('Masukkan email yang valid.'), findsOneWidget);
       expect(find.text('Kata sandi wajib diisi.'), findsOneWidget);
-      await press(tester, find.text('Pasien baru? Daftar'));
+      await press(tester, find.text('Pasien baru?  Daftar'));
       expect(
         find.widgetWithText(TextFormField, 'Nama lengkap'),
         findsOneWidget,
@@ -179,7 +182,7 @@ void main() {
       await press(tester, submit);
       await tester.enterText(email, 'fixture@test.local');
       await tester.enterText(password, 'fixture-only');
-      await press(tester, find.text('Pasien baru? Daftar'));
+      await press(tester, find.text('Pasien baru?  Daftar'));
       final name = find.byKey(const ValueKey('login-name'));
       expect(
         find.descendant(
@@ -345,9 +348,8 @@ void main() {
             find.widgetWithText(NavigationDestination, 'Profil'),
           );
           await press(tester, find.text('Keluar Akun'));
-        } else if (role == 'PETUGAS') {
-          await press(tester, find.byTooltip('Profil petugas'));
-          await press(tester, find.text('Keluar Akun'));
+        } else if (role == 'PETUGAS' || role == 'DOKTER') {
+          await logoutOperationalPortal(tester);
         } else {
           await press(tester, find.byTooltip('Keluar akun'));
         }
@@ -372,7 +374,7 @@ void main() {
           return http.Response('{}', 401);
         },
       );
-      await press(tester, find.text('Pasien baru? Daftar'));
+      await press(tester, find.text('Pasien baru?  Daftar'));
       await tester.enterText(
         find.byKey(const ValueKey('login-name')),
         'Pasien Fixture',

@@ -88,10 +88,10 @@ void main() {
           expect(api.user?['peran'], role);
           expect(find.text('Masuk'), findsNothing);
           if (role == 'DOKTER') {
-            expect(find.text('Dashboard Dokter'), findsOneWidget);
+            expect(find.textContaining('Selamat datang,'), findsOneWidget);
           }
           if (role == 'PETUGAS') {
-            expect(find.text('Pelayanan ruang ini'), findsOneWidget);
+            expect(find.text('Pelayanan Ruang Ini'), findsOneWidget);
           }
           if (role == 'USER') {
             await tester.tap(

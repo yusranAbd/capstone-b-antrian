@@ -304,7 +304,14 @@ void main() {
       }
       expect(find.byType(AdminNavigation), findsOneWidget);
       final profile = find.byTooltip('Profil akun');
-      await t.ensureVisible(profile);
+      await t.scrollUntilVisible(
+        profile,
+        200,
+        scrollable: find.descendant(
+          of: find.byType(AdminNavigation),
+          matching: find.byType(Scrollable),
+        ),
+      );
       await t.tap(profile);
       await t.pumpAndSettle();
       expect(find.text('Profil Saya'), findsOneWidget);

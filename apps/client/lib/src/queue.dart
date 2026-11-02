@@ -371,6 +371,7 @@ class _QueuePageState extends State<QueuePage> with WidgetsBindingObserver {
         data: StaffStyle.theme,
         child: AlertDialog(
           title: const Text('Dokter terjadwal'),
+          constraints: const BoxConstraints.tightFor(width: 668),
           scrollable: true,
           content: SizedBox(
             width: 620,
@@ -1116,6 +1117,7 @@ class _QueuePageState extends State<QueuePage> with WidgetsBindingObserver {
   );
 
   Widget servicePanel(BuildContext context, {double? height}) => Container(
+    key: const ValueKey('staff-service-panel'),
     height: height,
     clipBehavior: Clip.antiAlias,
     decoration: BoxDecoration(
@@ -1228,8 +1230,9 @@ class _QueuePageState extends State<QueuePage> with WidgetsBindingObserver {
           ],
         );
         Widget tickets() {
-          if (active.length <= 1)
+          if (active.length <= 1) {
             return ticketCard(active.firstOrNull, compact: compact);
+          }
           return Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,

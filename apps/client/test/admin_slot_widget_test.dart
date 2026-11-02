@@ -60,7 +60,7 @@ void main() {
       await expand(tester);
       final c = scope(tester, 0);
       expect(f.reads, {'a': 1});
-      final view = tester.widget<AdminDataView>(find.byType(AdminDataView));
+      final view = tester.state(find.byType(AdminDataView));
       final practice = tester
           .element(find.byType(AdminDataView))
           .read<PracticeScheduleCubit>();
@@ -69,10 +69,7 @@ void main() {
       await tester.tap(find.text('Muat ulang slot').first);
       await tester.pumpAndSettle();
       expect(c.state.slots.single['kapasitas'], 7);
-      expect(
-        tester.widget<AdminDataView>(find.byType(AdminDataView)),
-        same(view),
-      );
+      expect(tester.state(find.byType(AdminDataView)), same(view));
       await expand(tester, 1);
       expect(f.reads['b'], 1);
       expect(scope(tester, 1).state.slots.single['id'], 'slot-b');

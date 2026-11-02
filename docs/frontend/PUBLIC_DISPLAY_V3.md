@@ -1,5 +1,22 @@
 # Public Display Monitor V3
 
+## Perbaikan status sedang dilayani — 3 November 2026
+
+Panel utama mempertahankan tiket aktif ketika status berubah dari `DIPANGGIL`
+menjadi `DILAYANI`. Nomor, nama sesuai kebijakan snapshot publik, dan tujuan
+ruang/loket tetap tampil dengan label **SEDANG DILAYANI**. Jika ada tiket
+`DIPANGGIL`, panggilan tersebut diprioritaskan di atas tiket yang sedang dilayani.
+Pengumuman lama tidak dapat mengembalikan tiket yang sudah selesai ke panel utama.
+
+Perubahan ini hanya memperbaiki pemilihan tiket di Flutter. Kontrak snapshot,
+pairing, filter poli/tanggal, kebijakan nama server, dan Queue Engine tetap
+digunakan. Panel kanan tetap berisi antrean menunggu/dilewati. Peristiwa `START`
+memperbarui visual tanpa mengulang TTS; suara tetap mengikuti `CALL`/`RECALL`.
+
+Regresi terkait berada di `display_v2_test.dart` dan `display_v3_test.dart`,
+mencakup START/COMPLETE, prioritas panggilan baru, pengumuman lama, dan tiket
+terminal. Hasil validasi versi lama di bawah merupakan catatan historis.
+
 Satu monitor untuk satu poliklinik. Baseline `ba44b38` mencakup PR #67; aset WebP, tema cached, pemisahan clock dari snapshot, dan pelepasan resource TTS tetap dipertahankan. Tidak ada perubahan pairing, autentikasi, Queue Engine, database atau migration.
 
 ## Tampilan

@@ -231,6 +231,13 @@ describe('ReservasiService', () => {
             nomorUrut: 1,
             kodeTiket: expect.stringMatching(/^TK[A-F0-9]{24}$/) as string,
             status: StatusTiket.DIPESAN,
+            peristiwaAntrean: {
+              create: {
+                aktorId: penggunaId,
+                tipe: 'RESERVATION_BOOK',
+                statusSesudah: StatusTiket.DIPESAN,
+              },
+            },
           },
         }),
       );

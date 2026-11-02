@@ -20,6 +20,7 @@ import 'package:queueb_client/src/patient.dart';
 import 'package:queueb_client/src/user_profile.dart';
 import 'package:queueb_client/src/features/patient/application/patient_overview_cubit.dart';
 import 'package:queueb_client/src/features/patient/application/patient_ticket_cubit.dart';
+import 'package:queueb_client/src/features/insights/insights_cubit.dart';
 import 'package:queueb_client/src/routing/route_policy.dart';
 import 'package:timezone/data/latest.dart' as tz;
 
@@ -101,37 +102,62 @@ void main() {
     return (api, backend, router);
   }
 
-  testWidgets('ADMIN nine URLs share one owner and URI-derived selection', (
-    tester,
-  ) async {
-    final (_, backend, router) = await launch(tester, 'ADMIN');
-    final host = tester.state(find.byType(AdminPage));
-    final initialOwners = [...owners.created];
-    for (var i = 0; i < RoutePolicy.adminPaths.length; i++) {
-      router.go(RoutePolicy.adminPaths[i]);
+  testWidgets(
+    'ADMIN URLs retain shared owners and dispose page-local insights',
+    (tester) async {
+      final (_, backend, router) = await launch(tester, 'ADMIN');
+      final host = tester.state(find.byType(AdminPage));
+      final initialOwners = [...owners.created];
+      for (var i = 0; i < RoutePolicy.adminPaths.length; i++) {
+        router.go(RoutePolicy.adminPaths[i]);
+        await tester.pumpAndSettle();
+        expect(tester.state(find.byType(AdminPage)), same(host));
+        expect(
+          tester.widget<AdminNavigation>(find.byType(AdminNavigation)).selected,
+          i - 1,
+        );
+        expect(
+          owners.created.where((owner) => initialOwners.contains(owner)),
+          orderedEquals(initialOwners),
+        );
+        final pageOwners = owners.created
+            .where((owner) => !initialOwners.contains(owner))
+            .toList();
+        expect(pageOwners.every((owner) => owner is InsightsCubit), isTrue);
+        if (i < 9) expect(pageOwners, isEmpty);
+        expect(initialOwners.every((owner) => !owner.isClosed), isTrue);
+        expect(
+          pageOwners.where((owner) => !owner.isClosed).length,
+          i >= 9 ? 1 : 0,
+        );
+      }
+      metric({
+        'portal': 'admin',
+        'modules': RoutePolicy.adminPaths.length,
+        'created': owners.created.length,
+        'closed': owners.closed.length,
+      });
+      expect(backend.requests.where((r) => r.$1 == 'POST'), isEmpty);
+      router.go('/admin');
       await tester.pumpAndSettle();
-      expect(tester.state(find.byType(AdminPage)), same(host));
+      router.go('/admin/profile');
+      await tester.pumpAndSettle();
       expect(
-        tester.widget<AdminNavigation>(find.byType(AdminNavigation)).selected,
-        i - 1,
+        owners.created
+            .where(
+              (owner) =>
+                  !initialOwners.contains(owner) && owner is InsightsCubit,
+            )
+            .every((owner) => owner.isClosed),
+        isTrue,
       );
-      expect(owners.created, orderedEquals(initialOwners));
-    }
-    metric({
-      'portal': 'admin',
-      'modules': RoutePolicy.adminPaths.length,
-      'created': owners.created.length,
-      'closed': owners.closed.length,
-    });
-    expect(backend.requests.where((r) => r.$1 == 'POST'), isEmpty);
-    router.go('/admin/profile');
-    await tester.pumpAndSettle();
-    expect(find.byType(UserProfilePage), findsOneWidget);
-    expect(
-      tester.state(find.byType(AdminPage, skipOffstage: false)),
-      same(host),
-    );
-  });
+      expect(find.byType(UserProfilePage), findsOneWidget);
+      expect(
+        tester.state(find.byType(AdminPage, skipOffstage: false)),
+        same(host),
+      );
+    },
+  );
 
   testWidgets('ADMIN small-screen menu closes and projects routed selection', (
     tester,
@@ -304,7 +330,9 @@ void main() {
       );
       expect(find.text('Lihat tiket & QR'), findsNothing);
       expect(
-        find.bySemanticsLabel('Tiket tidak tersedia atau tidak dapat diakses.'),
+        find.bySemanticsLabel(
+          RegExp('Tiket tidak tersedia atau tidak dapat diakses\\.'),
+        ),
         findsOneWidget,
       );
       expect(backend.requests.where((r) => r.$1 != 'GET'), isEmpty);

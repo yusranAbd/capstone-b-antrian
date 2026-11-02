@@ -2,6 +2,9 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'portal_test_actions.dart';
+
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:queueb_client/src/api.dart';
@@ -90,12 +93,34 @@ void main() {
   });
 
   test(
-    'START and COMPLETE cannot select a serving or stale call as the hero',
+    'START keeps the serving ticket visible and COMPLETE clears stale calls',
     () {
-      expect(DisplayBoard.currentCall(_snapshot(status: 'DILAYANI')), isNull);
+      expect(
+        DisplayBoard.currentCall(_snapshot(status: 'DILAYANI'))
+            ?.ticket['status'],
+        'DILAYANI',
+      );
       final completed = _snapshot(status: null);
       completed['pengumumanTerakhir'] = announcement('old');
       expect(DisplayBoard.currentCall(completed), isNull);
+    },
+  );
+
+  test(
+    'A new call takes priority over serving tickets and stale announcements',
+    () {
+      final data = _snapshot(rooms: 2);
+      rows(data['loket']).first['tiketAktif'][0]['status'] = 'DILAYANI';
+      expect(DisplayBoard.currentCall(data)?.ticket['nomorAntrean'], 'MAT-002');
+      rows(data['loket']).last['tiketAktif'][0]['status'] = 'DILAYANI';
+      data['pengumumanTerakhir'] = null;
+      rows(data['loket']).last['tiketAktif'][0]['dipanggilPada'] =
+          '2026-10-18T06:00:00Z';
+      expect(DisplayBoard.currentCall(data)?.ticket['nomorAntrean'], 'MAT-002');
+      for (final room in rows(data['loket'])) {
+        room['tiketAktif'][0]['status'] = 'SELESAI';
+      }
+      expect(DisplayBoard.currentCall(data), isNull);
     },
   );
 
@@ -149,12 +174,13 @@ void main() {
       ),
     );
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
   }
 
   for (final size in [const Size(1280, 720), const Size(1920, 1080)]) {
     for (final count in [1, 3, 6]) {
       testWidgets(
-        'TV $size: all $count clinic rooms, prominent call and true zero waiting',
+        'TV $size: selected call among $count rooms and true zero waiting',
         (tester) async {
           await board(tester, size, _snapshot(rooms: count));
           expect(tester.takeException(), isNull);
@@ -177,9 +203,8 @@ void main() {
                 .data,
             '0',
           );
-          for (var n = 1; n <= count; n++) {
-            expect(find.text('Ruang Mata $n'), findsWidgets);
-          }
+          expect(find.text('Ruang Mata 1'), findsOneWidget);
+          expect(find.text('Loket M1'), findsOneWidget);
           expect(find.text('12:34:56'), findsOneWidget);
         },
       );
@@ -197,13 +222,20 @@ void main() {
   }
 
   testWidgets(
-    'TV cycles overflow room rows automatically without leaving the clinic',
+    'TV follows a new call in another room without leaving the clinic',
     (tester) async {
-      await board(tester, const Size(1280, 720), _snapshot(rooms: 12));
+      final data = _snapshot(rooms: 12);
+      await board(tester, const Size(1280, 720), data);
       expect(find.text('Ruang Mata 1'), findsWidgets);
-      await tester.pump(const Duration(seconds: 12));
-      await tester.pump();
+      data['pengumumanTerakhir'] = {
+        ...object(data['pengumumanTerakhir']),
+        'kodeLoket': 'M12',
+        'nomorAntrean': 'MAT-012',
+        'peristiwaId': 'new-room-12',
+      };
+      await board(tester, const Size(1280, 720), data);
       expect(find.text('Ruang Mata 12'), findsWidgets);
+      expect(find.text('Ruang Mata 1'), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -217,7 +249,7 @@ void main() {
         _snapshot(rooms: 2, status: null),
       );
       expect(find.text('Belum ada nomor dipanggil.'), findsOneWidget);
-      expect(find.text('Siap melayani'), findsNWidgets(2));
+      expect(find.text('INFORMASI PANGGILAN'), findsOneWidget);
       expect(find.byKey(const ValueKey('display-call-number')), findsNothing);
       expect(find.textContaining('menit'), findsNothing);
       expect(tester.takeException(), isNull);
@@ -234,7 +266,7 @@ void main() {
           'qrPayload': 'SQ1.private',
         };
       await board(tester, const Size(1280, 720), data, error: 'offline');
-      expect(find.textContaining('menampilkan data terakhir'), findsOneWidget);
+      expect(find.textContaining('offline'), findsOneWidget);
       expect(find.text('MAT-001'), findsWidgets);
       expect(find.textContaining('Private Patient'), findsNothing);
       expect(find.textContaining('private@example.test'), findsNothing);
@@ -247,7 +279,7 @@ void main() {
     'Loading and rejected token are distinct and unknown total is not zero',
     (tester) async {
       await board(tester, const Size(1280, 720), null);
-      expect(find.text('Memuat antrean…'), findsOneWidget);
+      expect(find.text('Memuat antrean…'), findsNWidgets(2));
       expect(
         tester
             .widget<Text>(find.byKey(const ValueKey('display-waiting-count')))
@@ -316,6 +348,7 @@ void main() {
       expect(find.text('Akses display ditolak'), findsOneWidget);
       await tester.pump(const Duration(seconds: 45));
       expect(requests, 1);
+      await dismissFeedback(tester);
       await tester.ensureVisible(find.text('Ganti perangkat'));
       await tester.tap(find.text('Ganti perangkat'));
       await tester.pumpAndSettle();

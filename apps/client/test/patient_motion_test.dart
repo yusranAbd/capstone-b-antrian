@@ -399,7 +399,8 @@ void main() {
       );
       await openPatientTickets(tester);
       expect(find.byType(Animate), findsNothing);
-      expect(success, findsOneWidget);
+      expect(success, findsNothing);
+      expect(backend.tickets.single['status'], 'DIPESAN');
     },
   );
 
@@ -454,7 +455,7 @@ void main() {
   );
 
   testWidgets(
-    'tab change after success preserves feedback without replay or extra owner',
+    'tab change dismisses success feedback without replay or extra owner',
     (tester) async {
       final (_, backend, gate, owners) = await pendingBooking(tester);
       final count = owners.created.length;
@@ -466,7 +467,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 250));
       await openPatientTickets(tester);
       expect(find.byType(Animate), findsNothing);
-      expect(find.textContaining('Pendaftaran berhasil.'), findsOneWidget);
+      expect(find.textContaining('Pendaftaran berhasil.'), findsNothing);
+      expect(backend.tickets.single['status'], 'DIPESAN');
       expect(owners.created.length, count);
       expect(
         backend.requests.where((r) => r.$1 == 'POST' && r.$2 == '/reservasi'),

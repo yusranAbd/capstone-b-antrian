@@ -126,7 +126,7 @@ void main() {
     },
   );
   test(
-    'V7.1 keeps Pendaftaran then Apotek, with all remaining rows stable',
+    'registration and pharmacy aliases are grouped with stable server order',
     () {
       final rows = <Json>[
         {'kode': 'ADMINISTRASI'},
@@ -137,11 +137,11 @@ void main() {
       ];
       final before = [...rows];
       expect(registrationFirst(rows).map((r) => r['kode']), [
-        'PENDAFTARAN',
-        'APOTEK',
         'ADMINISTRASI',
-        'APOTIK',
+        'PENDAFTARAN',
         'REGISTRASI',
+        'APOTIK',
+        'APOTEK',
       ]);
       expect(rows, orderedEquals(before));
     },

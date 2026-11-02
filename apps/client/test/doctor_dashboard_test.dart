@@ -13,6 +13,8 @@ import 'package:queueb_client/src/doctor.dart';
 import 'package:queueb_client/src/doctor_dashboard.dart';
 import 'package:queueb_client/src/mobile_ui.dart';
 
+import 'portal_test_actions.dart';
+
 void main() {
   setUpAll(tz.initializeTimeZones);
   const poli = {'id': 'p', 'nama': 'Poli Mata'},
@@ -123,7 +125,7 @@ void main() {
       await tester.ensureVisible(find.byTooltip('Antrean berikutnya'));
       await tester.tap(find.byTooltip('Antrean berikutnya'));
       await tester.pumpAndSettle();
-      expect(find.text('M-0010'), findsOneWidget);
+      expect(find.text('M-0005'), findsOneWidget);
       await tester.ensureVisible(find.byType(TextField));
       await tester.enterText(find.byType(TextField), 'M-1999');
       await tester.pumpAndSettle();
@@ -131,10 +133,8 @@ void main() {
         find.byWidgetPredicate((w) => w is Text && w.data == 'M-1999'),
         findsOneWidget,
       );
-      expect(find.text('M-0010'), findsNothing);
-      await tester.tap(find.text('Semua status'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Menunggu').last);
+      expect(find.text('M-0005'), findsNothing);
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Menunggu (1999)'));
       await tester.pumpAndSettle();
       expect(find.text('Belum ada antrean yang sesuai.'), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -195,10 +195,11 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(find.text('Dashboard Dokter'), findsOneWidget);
-        expect(find.text('Janji Hari Ini'), findsOneWidget);
-        expect(find.text('Dalam Antrean'), findsOneWidget);
-        expect(find.text('Konsultasi Selesai'), findsOneWidget);
+        expect(find.textContaining('Selamat datang,'), findsOneWidget);
+        expect(find.byType(DoctorQueuePanel), findsOneWidget);
+        expect(find.byType(DoctorLivePanel), findsOneWidget);
+        expect(find.text('Dilayani (1)'), findsOneWidget);
+        expect(find.text('Selesai (1)'), findsOneWidget);
         expect(find.text('Praktik Aktif'), findsOneWidget);
         expect(find.byType(NavigationBar), findsNothing);
         expect(find.text('M-007'), findsWidgets);
@@ -265,17 +266,18 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(ActionChip, 'M-002'));
+      await tester.tap(find.widgetWithText(ChoiceChip, 'M-002'));
       await tester.pumpAndSettle();
       expect(find.text('Dilayani'), findsOneWidget);
-      expect(find.text('M2 · Ruang Dua'), findsOneWidget);
+      expect(find.text('M2 · Antrean'), findsOneWidget);
       expect(find.text('RAHASIA'), findsNothing);
       await tester.tap(find.text('Lihat detail antrean'));
       await tester.pumpAndSettle();
       expect(find.text('Detail antrean M-002'), findsOneWidget);
+      expect(find.text('Ruang Dua'), findsOneWidget);
       expect(
         find.text(
-          'Nama pasien, keluhan dan catatan klinis tidak disediakan pada portal ini.',
+          'Nama pasien, identitas dan catatan klinis tidak disediakan pada portal ini.',
         ),
         findsOneWidget,
       );
@@ -337,13 +339,13 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('M-008'), findsWidgets);
       denied = true;
-      await tester.tap(find.byTooltip('Muat ulang portal'));
+      await tester.tap(find.byTooltip('Muat ulang portal dokter'));
       await tester.pumpAndSettle();
       expect(snapshotReads, 2);
       expect(find.text('M-008'), findsNothing);
       expect(find.text('M-004'), findsOneWidget);
       expect(
-        find.textContaining('Monitoring tersedia selama sesi'),
+        find.text('Monitoring tersedia saat sesi praktik aktif.'),
         findsOneWidget,
       );
       expect(find.text('Praktik Aktif'), findsNothing);
@@ -354,7 +356,7 @@ void main() {
   );
 
   testWidgets(
-    'retry after a failed refresh keeps KPI unavailable until REST completes',
+    'retry after a failed refresh keeps queue unavailable until REST completes',
     (tester) async {
       int phase = 0;
       var resumed = Completer<void>();
@@ -388,9 +390,9 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('1'), findsOneWidget);
+      expect(find.text('M-001'), findsOneWidget);
       phase = 1;
-      await tester.tap(find.byTooltip('Muat ulang portal'));
+      await tester.tap(find.byTooltip('Muat ulang portal dokter'));
       await tester.pumpAndSettle();
       expect(
         find.textContaining(
@@ -398,26 +400,26 @@ void main() {
         ),
         findsOneWidget,
       );
+      await dismissFeedback(tester);
       phase = 2;
-      await tester.tap(find.byTooltip('Muat ulang portal'));
+      await tester.tap(find.byTooltip('Muat ulang portal dokter'));
       await tester.pump();
-      expect(find.text('0'), findsNothing);
-      expect(find.text('1'), findsNothing);
-      expect(find.text('Data belum tersedia'), findsNWidgets(4));
+      expect(find.text('M-001'), findsNothing);
+      expect(find.text('Menunggu (—)'), findsOneWidget);
+      expect(find.text('Semua (—)'), findsOneWidget);
       resumed.complete();
       await tester.pumpAndSettle();
-      expect(find.text('1'), findsOneWidget);
+      expect(find.text('M-001'), findsOneWidget);
       resumed = Completer<void>();
-      await tester.tap(find.text('Tanggal: ${config.today}'));
+      await tester.tap(find.byKey(const ValueKey('doctor-date-picker')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('OK'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text('0'), findsNothing);
-      expect(find.text('1'), findsNothing);
+      expect(find.text('M-001'), findsNothing);
       resumed.complete();
       await tester.pumpAndSettle();
-      expect(find.text('1'), findsOneWidget);
+      expect(find.text('M-001'), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
       api.dispose();
       await tester.binding.setSurfaceSize(null);
@@ -458,9 +460,8 @@ void main() {
       await api.login('doctor@test.local', 'Synthetic-Test-123!');
       await tester.pumpWidget(QueueBApp(api: api));
       await tester.pumpAndSettle();
-      expect(find.text('Dashboard Dokter'), findsOneWidget);
-      await tester.tap(find.byTooltip('Keluar akun'));
-      await tester.pumpAndSettle();
+      expect(find.textContaining('Selamat datang,'), findsOneWidget);
+      await logoutOperationalPortal(tester);
       expect(find.byType(DoctorPage), findsNothing);
       expect(api.user, isNull);
       expect(api.accessToken, isNull);
@@ -506,12 +507,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'M-001');
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Semua status'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Dipesan').last);
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Selesai (1)'));
       await tester.pumpAndSettle();
       phase = 1;
-      await tester.tap(find.byTooltip('Muat ulang portal'));
+      await tester.tap(find.byTooltip('Muat ulang portal dokter'));
       await tester.pump();
       expect(
         tester.widget<EditableText>(find.byType(EditableText)).controller.text,
@@ -523,7 +522,12 @@ void main() {
         tester.widget<EditableText>(find.byType(EditableText)).controller.text,
         'M-001',
       );
-      expect(find.text('Dipesan'), findsOneWidget);
+      expect(
+        tester
+            .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Selesai (1)'))
+            .selected,
+        isTrue,
+      );
       expect(find.text('Belum ada antrean yang sesuai.'), findsOneWidget);
       expect(find.text('M-002'), findsNothing);
       await tester.pumpWidget(const SizedBox());

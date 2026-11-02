@@ -1,4 +1,5 @@
 import 'patient_test_navigation.dart';
+import 'portal_test_actions.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -67,6 +68,10 @@ class FakeBackend {
         ? <String, dynamic>{}
         : object(jsonDecode(request.body));
     requests.add((request.method, path, body));
+    if (path == '/display/sesi') return reply({}, 401);
+    if (path == '/notifikasi/saya') {
+      return reply({'data': <Json>[], 'belumDibaca': 0, 'jumlahHalaman': 1});
+    }
     if (path == '/auth/login') {
       return reply({
         'accessToken': 'test',
@@ -380,6 +385,7 @@ void main() {
   ) async {
     await displayForSpeech(tester, failSpeak: true);
     await press(tester, 'Aktifkan suara');
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Aktifkan suara'), findsOneWidget);
     expect(find.text('Matikan suara'), findsNothing);
     expect(
@@ -392,6 +398,7 @@ void main() {
     (tester) async {
       await displayForSpeech(tester, unavailableLanguage: true);
       await press(tester, 'Aktifkan suara');
+      await tester.pump(const Duration(milliseconds: 300));
       expect(find.text('Aktifkan suara'), findsOneWidget);
       expect(find.text('Matikan suara'), findsNothing);
       expect(
@@ -415,6 +422,7 @@ void main() {
       (_) {},
     );
     await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Aktifkan suara'), findsOneWidget);
     expect(
       find.text('Suara tidak tersedia. Gunakan pengumuman visual.'),
@@ -430,7 +438,7 @@ void main() {
     await press(tester, 'Masuk', type: FilledButton);
     expect(find.text('Masukkan email yang valid.'), findsOneWidget);
     expect(server.requests, isEmpty);
-    await press(tester, 'Pasien baru? Daftar');
+    await press(tester, 'Pasien baru?  Daftar');
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Nama lengkap'),
       'Pasien Baru',
@@ -477,7 +485,7 @@ void main() {
     (tester) async {
       final server = FakeBackend('PETUGAS');
       await launch(tester, server);
-      await tester.tap(find.byType(FloatingActionButton));
+      await tester.tap(find.text('Pindai QR'));
       await tester.pumpAndSettle();
       final scanned = tester
           .widget<StaffQrScanner>(find.byType(StaffQrScanner))
@@ -488,18 +496,21 @@ void main() {
       expect(server.status, 'MENUNGGU');
       expect(server.requests.where((r) => r.$2.endsWith('/masuk')), isEmpty);
       expect(server.status, 'MENUNGGU');
-      await press(tester, 'Panggil berikutnya');
+      await press(tester, 'Panggil Berikutnya');
       await press(tester, 'Panggil Ulang');
-      await press(tester, 'Lewati');
+      await press(tester, 'Tunda');
       expect(server.status, 'DILEWATI');
+      await dismissFeedback(tester);
+      await selectStaffQueueTab(tester, 'Tindak lanjut');
       await tester.ensureVisible(find.byTooltip('Aksi UM-001'));
       await tester.tap(find.byTooltip('Aksi UM-001'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Kembalikan ke Antrean'));
       await tester.pumpAndSettle();
-      await press(tester, 'Panggil berikutnya');
+      await dismissFeedback(tester);
+      await press(tester, 'Panggil Berikutnya');
       await press(tester, 'Mulai Pelayanan');
-      await press(tester, 'Selesaikan Pelayanan');
+      await press(tester, 'Selesaikan');
       expect(server.status, 'SELESAI');
       expect(tester.takeException(), isNull);
     },
@@ -601,6 +612,11 @@ void main() {
     await launch(tester, server, size: const Size(390, 844));
     expect(find.byType(NavigationRail), findsNothing);
     await press(tester, 'Menu administrasi');
+    await tester.scrollUntilVisible(
+      find.byTooltip('Profil akun'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.tap(find.byTooltip('Profil akun'));
     await tester.pumpAndSettle();
     expect(find.text('Profil Saya'), findsOneWidget);
@@ -671,6 +687,7 @@ void main() {
       findsOneWidget,
     );
     server.offline = false;
+    await dismissFeedback(tester);
     await press(tester, 'Coba lagi');
     expect(
       find.textContaining(
@@ -731,12 +748,26 @@ void main() {
       tester,
     ) async {
       await launch(tester, FakeBackend('PETUGAS'), size: Size(width, 900));
-      expect(find.text('Daftar antrean poli'), findsOneWidget);
+      expect(find.text('Daftar Antrean Poli'), findsOneWidget);
       expect(find.text('Mulai Pelayanan'), findsNothing);
-      expect(find.text('Selesaikan Pelayanan'), findsNothing);
-      await press(tester, 'Panggil berikutnya');
+      expect(
+        tester
+            .widget<OutlinedButton>(
+              find.widgetWithText(OutlinedButton, 'Selesaikan'),
+            )
+            .onPressed,
+        isNull,
+      );
+      await press(tester, 'Panggil Berikutnya');
       expect(find.text('Mulai Pelayanan'), findsOneWidget);
-      expect(find.text('Selesaikan Pelayanan'), findsNothing);
+      expect(
+        tester
+            .widget<OutlinedButton>(
+              find.widgetWithText(OutlinedButton, 'Selesaikan'),
+            )
+            .onPressed,
+        isNull,
+      );
       expect(tester.takeException(), isNull);
     });
   }

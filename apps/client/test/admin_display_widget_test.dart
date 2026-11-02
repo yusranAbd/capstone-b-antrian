@@ -49,7 +49,11 @@ void main() {
     (tester) async {
       await open(tester);
       final c = scope(tester);
-      expect(f.reads, {adminDisplayPath: 1, '/layanan': 1});
+      expect(f.reads, {
+        adminDisplayPath: 1,
+        '/layanan': 1,
+        '/layanan/kesiapan': 1,
+      });
       expect(find.text('TV a'), findsOneWidget);
       expect(find.text('TV b'), findsOneWidget);
       expect(

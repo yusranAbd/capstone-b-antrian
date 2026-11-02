@@ -75,10 +75,10 @@ void main() {
     testWidgets('Essential controls fit first viewport $size', (tester) async {
       await launch(tester, StaffBackend(), size);
       for (final finder in [
-        find.text('Daftar antrean poli'),
-        find.text('Pelayanan ruang ini'),
+        find.text('Daftar Antrean Poli'),
+        find.text('Pelayanan Ruang Ini'),
         find.text('Pindai QR'),
-        find.text('Ruang yang ditugaskan'),
+        find.text('Ruangan yang ditugaskan'),
       ]) {
         expect(finder, findsOneWidget);
         expect(tester.getBottomLeft(finder).dy, lessThan(size.height));
@@ -113,10 +113,10 @@ void main() {
     try {
       await tester.pump();
       final searchNode = tester.getSemantics(
-        find.bySemanticsLabel('Cari nomor antrean atau nama pasien'),
+        find.bySemanticsLabel('Cari nomor antrean atau nama pasien…'),
       );
       expect(searchNode.label, contains('Cari nomor antrean atau nama pasien'));
-      expect(searchNode.label, isNot(contains('Pelayanan ruang ini')));
+      expect(searchNode.label, isNot(contains('Pelayanan Ruang Ini')));
     } finally {
       semantics.dispose();
     }
@@ -127,16 +127,17 @@ void main() {
     expect(find.textContaining('SLOT BELUM MULAI'), findsOneWidget);
     final initial = backend.requests.length;
     await tester.enterText(
-      find.widgetWithText(TextField, 'Cari nomor antrean atau nama pasien'),
+      find.widgetWithText(TextField, 'Cari nomor antrean atau nama pasien…'),
       '002',
     );
     await tester.pumpAndSettle();
     expect(find.text('UM-009'), findsNothing);
     expect(find.text('UM-002'), findsOneWidget);
-    expect(find.textContaining('2/12 tiket dimuat'), findsOneWidget);
+    expect(find.text('Menunggu (12)'), findsOneWidget);
+    expect(find.text('Menampilkan 1–1 dari 1 antrean'), findsOneWidget);
     expect(backend.requests.length, initial);
     await tester.enterText(
-      find.widgetWithText(TextField, 'Cari nomor antrean atau nama pasien'),
+      find.widgetWithText(TextField, 'Cari nomor antrean atau nama pasien…'),
       '',
     );
     await tester.pumpAndSettle();
@@ -158,7 +159,8 @@ void main() {
           ..gate = Completer<void>()
           ..failCall = true;
         await launch(tester, backend, size);
-        final call = find.widgetWithText(FilledButton, 'Panggil berikutnya');
+        final call = find.widgetWithText(FilledButton, 'Panggil Berikutnya');
+        await tester.ensureVisible(call);
         await tester.tap(call);
         await tester.pump();
         expect(tester.widget<FilledButton>(call).onPressed, isNull);

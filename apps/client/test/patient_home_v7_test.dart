@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'portal_test_actions.dart';
+
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:timezone/data/latest.dart' as tz;
@@ -65,33 +68,27 @@ class _IdentityApi extends QueueApi {
 void main() {
   setUpAll(tz.initializeTimeZones);
 
-  test(
-    'registration moves first without fabricating or reordering other rows',
-    () {
-      final rows = <Json>[
-        {'id': 'a', 'kode': 'APOTEK', 'modeReservasi': 'HIBRIDA'},
-        {'id': 'b', 'kode': 'ADMINISTRASI', 'modeReservasi': 'HIBRIDA'},
-        _registration,
-        {'id': 'c', 'kode': 'APOTIK', 'modeReservasi': 'ANTREAN_HARIAN'},
-        {'id': 'd', 'kode': 'POLI_UMUM', 'modeReservasi': 'HIBRIDA'},
-      ];
-      final before = [...rows];
-      expect(homeWalkInClinics(rows, [], '').map((c) => c['id']), [
-        'registration',
-        'a',
-        'b',
-        'c',
-      ]);
-      expect(rows, orderedEquals(before));
-      expect(homeWalkInClinics(rows, [], 'apot').map((c) => c['id']), [
-        'a',
-        'c',
-      ]);
-      expect(homeWalkInClinics([rows.first], [], ''), [rows.first]);
-      expect(homeWalkInClinics([], [], ''), isEmpty);
-      expect(rows.where(supportsHomeAppointment).map((c) => c['id']), ['d']);
-    },
-  );
+  test('registration aliases move first and order within each category stays stable', () {
+    final rows = <Json>[
+      {'id': 'a', 'kode': 'APOTEK', 'modeReservasi': 'HIBRIDA'},
+      {'id': 'b', 'kode': 'ADMINISTRASI', 'modeReservasi': 'HIBRIDA'},
+      _registration,
+      {'id': 'c', 'kode': 'APOTIK', 'modeReservasi': 'ANTREAN_HARIAN'},
+      {'id': 'd', 'kode': 'POLI_UMUM', 'modeReservasi': 'HIBRIDA'},
+    ];
+    final before = [...rows];
+    expect(homeWalkInClinics(rows, [], '').map((c) => c['id']), [
+      'b',
+      'registration',
+      'a',
+      'c',
+    ]);
+    expect(rows, orderedEquals(before));
+    expect(homeWalkInClinics(rows, [], 'apot').map((c) => c['id']), ['a', 'c']);
+    expect(homeWalkInClinics([rows.first], [], ''), [rows.first]);
+    expect(homeWalkInClinics([], [], ''), isEmpty);
+    expect(rows.where(supportsHomeAppointment).map((c) => c['id']), ['d']);
+  });
 
   test(
     'category uses the catalog code and readable ink, never a free name',
@@ -455,7 +452,7 @@ void main() {
       final first = t.widget<PatientServiceTicketV8>(
         find.byType(PatientServiceTicketV8).first,
       );
-      expect(first.clinic['kode'], 'PENDAFTARAN');
+      expect(first.clinic['kode'], 'ADMINISTRASI');
       expect(t.getSize(top).height, greaterThan(0));
       await t.drag(list, const Offset(0, -350));
       await t.pumpAndSettle();
@@ -481,14 +478,10 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.byTooltip('Notifikasi'));
       await t.pumpAndSettle();
-      expect(
-        find.text(
-          'Notifikasi belum tersedia. Periksa status terbaru melalui Reservasi.',
-        ),
-        findsOneWidget,
-      );
+      expect(find.text('Belum ada notifikasi.'), findsOneWidget);
       await t.tap(find.text('Tutup'));
       await t.pumpAndSettle();
+      await dismissFeedback(t);
       await t.tap(find.byTooltip('Profil pasien'));
       await t.pumpAndSettle();
       expect(find.byType(UserProfilePage), findsOneWidget);

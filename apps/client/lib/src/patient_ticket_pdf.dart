@@ -73,7 +73,10 @@ class PatientTicketPdf {
       ticket.roomName ?? '',
     ].where((value) => value.length > 29).length;
     // QR reservasi membutuhkan sekitar 50 mm ruang vertikal tambahan.
-    final heightMm = 103.0 + (optional * 9.0) + (longFields * 6.0) +
+    final heightMm =
+        103.0 +
+        (optional * 9.0) +
+        (longFields * 6.0) +
         (ticket.receiptQrPayload == null ? 0.0 : 52.0);
     return PdfPageFormat(
       paperWidthMm * PdfPageFormat.mm,
@@ -100,22 +103,27 @@ class PatientTicketPdf {
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Text(label.toUpperCase(),
-              style: const pw.TextStyle(fontSize: 7, color: muted)),
+          pw.Text(
+            label.toUpperCase(),
+            style: const pw.TextStyle(fontSize: 7, color: muted),
+          ),
           pw.SizedBox(height: 2),
-          pw.Text(value,
-              style: pw.TextStyle(
-                fontSize: 9,
-                color: ink,
-                fontWeight: pw.FontWeight.bold,
-              )),
+          pw.Text(
+            value,
+            style: pw.TextStyle(
+              fontSize: 9,
+              color: ink,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
         ],
       ),
     );
 
     final details = <(String, String)>[
       ('Tanggal pelayanan', ticket.serviceDate),
-      if (ticket.consultationTime case final value? when value.trim().isNotEmpty)
+      if (ticket.consultationTime case final value?
+          when value.trim().isNotEmpty)
         ('Jam konsultasi', value),
       if (ticket.doctorName case final value? when value.trim().isNotEmpty)
         ('Dokter', value),
@@ -133,30 +141,49 @@ class PatientTicketPdf {
         build: (context) => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.stretch,
           children: [
-            pw.Text('QueueB Hospital',
-                textAlign: pw.TextAlign.center,
-                style: pw.TextStyle(
-                    fontSize: 13, color: ink, fontWeight: pw.FontWeight.bold)),
+            pw.Text(
+              'QueueB Hospital',
+              textAlign: pw.TextAlign.center,
+              style: pw.TextStyle(
+                fontSize: 13,
+                color: ink,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
             pw.SizedBox(height: 3),
-            pw.Text('BUKTI RESERVASI',
-                textAlign: pw.TextAlign.center,
-                style: const pw.TextStyle(fontSize: 8, color: muted)),
+            pw.Text(
+              'BUKTI RESERVASI',
+              textAlign: pw.TextAlign.center,
+              style: const pw.TextStyle(fontSize: 8, color: muted),
+            ),
             pw.SizedBox(height: 8),
             pw.Divider(color: divider, thickness: .7),
             pw.SizedBox(height: 5),
-            pw.Text(ticket.queueNumber,
-                textAlign: pw.TextAlign.center,
-                style: pw.TextStyle(
-                    fontSize: 24, color: ink, fontWeight: pw.FontWeight.bold)),
+            pw.Text(
+              ticket.queueNumber,
+              textAlign: pw.TextAlign.center,
+              style: pw.TextStyle(
+                fontSize: 24,
+                color: ink,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
             pw.SizedBox(height: 2),
-            pw.Text(ticket.serviceName,
-                textAlign: pw.TextAlign.center,
-                style: const pw.TextStyle(fontSize: 9, color: muted)),
+            pw.Text(
+              ticket.serviceName,
+              textAlign: pw.TextAlign.center,
+              style: const pw.TextStyle(fontSize: 9, color: muted),
+            ),
             pw.SizedBox(height: 4),
-            pw.Text('STATUS: ${ticket.status.toUpperCase()}',
-                textAlign: pw.TextAlign.center,
-                style: pw.TextStyle(
-                    fontSize: 9, color: ink, fontWeight: pw.FontWeight.bold)),
+            pw.Text(
+              'STATUS: ${ticket.status.toUpperCase()}',
+              textAlign: pw.TextAlign.center,
+              style: pw.TextStyle(
+                fontSize: 9,
+                color: ink,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
             pw.SizedBox(height: 7),
             pw.Divider(color: divider, thickness: .7),
             pw.SizedBox(height: 7),
@@ -174,28 +201,46 @@ class PatientTicketPdf {
                 ),
               ),
               pw.SizedBox(height: 4),
-              pw.Text('QR BUKTI RESERVASI',
-                  textAlign: pw.TextAlign.center,
-                  style: pw.TextStyle(fontSize: 8, color: ink, fontWeight: pw.FontWeight.bold)),
+              pw.Text(
+                'QR BUKTI RESERVASI',
+                textAlign: pw.TextAlign.center,
+                style: pw.TextStyle(
+                  fontSize: 8,
+                  color: ink,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
               pw.SizedBox(height: 3),
-              pw.Text('Bukan QR check-in. Petugas memverifikasi bukti; '
-                  'check-in tetap mengikuti prosedur pada hari pelayanan.',
-                  textAlign: pw.TextAlign.center,
-                  style: const pw.TextStyle(fontSize: 7.5, color: muted)),
+              pw.Text(
+                'Bukan QR check-in. Petugas memverifikasi bukti; '
+                'check-in tetap mengikuti prosedur pada hari pelayanan.',
+                textAlign: pw.TextAlign.center,
+                style: const pw.TextStyle(fontSize: 7.5, color: muted),
+              ),
             ] else ...[
-              pw.Text('QR BUKTI RESERVASI TIDAK TERSEDIA',
-                  textAlign: pw.TextAlign.center,
-                  style: pw.TextStyle(fontSize: 8, color: ink, fontWeight: pw.FontWeight.bold)),
+              pw.Text(
+                'QR BUKTI RESERVASI TIDAK TERSEDIA',
+                textAlign: pw.TextAlign.center,
+                style: pw.TextStyle(
+                  fontSize: 8,
+                  color: ink,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
               pw.SizedBox(height: 4),
-              pw.Text('Tunjukkan nomor antrean kepada petugas. '
-                  'QR check-in aktif diterbitkan sesuai aturan pelayanan.',
-                  textAlign: pw.TextAlign.center,
-                  style: const pw.TextStyle(fontSize: 7.5, color: muted)),
+              pw.Text(
+                'Tunjukkan nomor antrean kepada petugas. '
+                'QR check-in aktif diterbitkan sesuai aturan pelayanan.',
+                textAlign: pw.TextAlign.center,
+                style: const pw.TextStyle(fontSize: 7.5, color: muted),
+              ),
             ],
             pw.SizedBox(height: 7),
-            pw.Text('Terima kasih',
-                textAlign: pw.TextAlign.center,
-                style: const pw.TextStyle(fontSize: 8, color: muted)),
+            pw.Text(
+              'Terima kasih',
+              textAlign: pw.TextAlign.center,
+              style: const pw.TextStyle(fontSize: 8, color: muted),
+            ),
           ],
         ),
       ),

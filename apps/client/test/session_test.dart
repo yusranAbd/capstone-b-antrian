@@ -1,4 +1,7 @@
 import 'dart:async';
+
+import 'portal_test_actions.dart';
+
 import 'dart:convert';
 
 import 'patient_test_navigation.dart';
@@ -686,13 +689,18 @@ void main() {
           find.widgetWithText(OutlinedButton, 'Menu administrasi'),
         );
         await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(
+          find.byTooltip('Profil akun'),
+          200,
+          scrollable: find.byType(Scrollable).last,
+        );
       }
       expect(
         role == 'USER'
             ? find.widgetWithText(NavigationDestination, 'Profil')
-            : find.byTooltip(
-                role == 'PETUGAS' ? 'Profil petugas' : 'Profil akun',
-              ),
+            : role == 'PETUGAS' || role == 'DOKTER'
+            ? operationalProfileButton()
+            : find.byTooltip('Profil akun'),
         findsOneWidget,
       );
       if (role == 'ADMIN') {
@@ -701,8 +709,8 @@ void main() {
       }
       expect(
         find.text(switch (role) {
-          'ADMIN' => 'Poliklinik',
-          'PETUGAS' => 'Ruang yang ditugaskan',
+          'ADMIN' => 'Dashboard',
+          'PETUGAS' => 'Ruangan yang ditugaskan',
           _ => 'Semoga harimu sehat dan lancar',
         }),
         findsWidgets,

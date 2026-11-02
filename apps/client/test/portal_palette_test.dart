@@ -27,7 +27,7 @@ void main() {
       expect(DoctorStyle.deepNavy, QueueBPalette.console);
       expect(DoctorStyle.deepTeal, QueueBPalette.consoleEnd);
       expect(AdminStyle.sky, QueueBPalette.soft);
-      expect(StaffStyle.theme.textTheme.bodyMedium!.fontSize, 12);
+      expect(StaffStyle.theme.textTheme.bodyMedium!.fontSize, 13);
       expect(PatientDesign.theme.textTheme.bodyMedium!.fontSize, 14);
       expect(QueueBStyle.theme.extension<PatientAppearance>(), isNull);
     },
@@ -79,7 +79,11 @@ void main() {
       final panel = t.widget<Container>(
         find.byKey(const ValueKey('display-call-panel')),
       );
-      expect((panel.decoration! as BoxDecoration).color, QueueBPalette.hero);
+      expect(
+        ((panel.decoration! as BoxDecoration).gradient! as LinearGradient)
+            .colors,
+        const [Color(0xff3063d6), Color(0xff2855c7)],
+      );
       expect(find.byKey(const ValueKey('display-call-number')), findsOneWidget);
       expect(find.byType(Scrollable), findsNothing);
       expect(t.takeException(), isNull);
@@ -88,7 +92,7 @@ void main() {
           theme: StaffStyle.theme,
           home: const Scaffold(
             body: StaffPanel(
-              title: 'Pelayanan ruang ini',
+              title: 'Pelayanan Ruang Ini',
               icon: Icons.campaign_outlined,
               dark: true,
               child: Text('AN-001'),

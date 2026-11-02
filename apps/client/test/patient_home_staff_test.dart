@@ -63,7 +63,7 @@ void main() {
           serviceId: 'apotek',
           date: '2026-11-01',
         ),
-        'Dokter terkait: Savira',
+        'Savira',
       );
     },
   );
@@ -75,7 +75,7 @@ void main() {
         serviceId: 'apotek',
         date: '2026-11-01',
       ),
-      'Terjadwal: Savira',
+      'Savira',
     );
   });
   test('tidak menampilkan dokter layanan lain', () {
@@ -86,7 +86,7 @@ void main() {
         serviceId: 'radiologi',
         date: '2026-11-01',
       ),
-      'Dokter terkait belum tersedia',
+      '',
     );
   });
   test('dokter nonaktif tidak muncul pada fallback', () {
@@ -99,7 +99,7 @@ void main() {
         serviceId: 'apotek',
         date: '2026-11-01',
       ),
-      'Dokter terkait belum tersedia',
+      '',
     );
   });
   test('fallback menerima relasi aktif tanpa tanggal sesi', () {
@@ -126,7 +126,7 @@ void main() {
         serviceId: 'radiologi',
         date: '2026-11-01',
       ),
-      'Dokter terkait: Radiologi',
+      'Radiologi',
     );
     expect(
       patientServiceProviderLabel(
@@ -135,7 +135,7 @@ void main() {
         serviceId: 'laboratorium',
         date: '2026-11-01',
       ),
-      'Dokter terkait: Yusril',
+      'Yusril',
     );
   });
   test('mengabaikan jadwal nonaktif', () {
