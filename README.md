@@ -6,7 +6,11 @@ Universitas Terbuka.
 
 ## Status
 
-🚧 Tahap Analisis dan Perancangan
+Backend MVP QueueB Hospital selesai. Aplikasi Flutter di `apps/client` menyediakan portal PASIEN (USER), ADMIN, PETUGAS, DOKTER, dan Public Display, termasuk tiket digital, cetak, dan unduh PDF.
+
+Kontrak API: [Panduan Integrasi Backend](docs/backend/API_INTEGRATION_GUIDE.md).
+Menjalankan aplikasi: [Panduan Instalasi Lokal](docs/setup/LOCAL_INSTALLATION_GUIDE.md).
+Acuan tampilan: [Panduan UI/UX QueueB](docs/frontend/QUEUEB_UI_UX_GUIDELINES.md).
 
 ## Tujuan
 
@@ -27,7 +31,8 @@ mendukung proses pelayanan secara terintegrasi melalui:
 
 ```text
 apps/
-├── client/     Flutter Android dan Web
+├── client/     Flutter Android dan Web untuk lima portal
+├── web/        Folder tambahan; belum berisi source aplikasi lengkap
 └── api/        NestJS Backend
 
 docs/

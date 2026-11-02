@@ -2,12 +2,14 @@ import {
   ConflictException,
   Injectable,
   Logger,
+  Optional,
   NotFoundException,
 } from '@nestjs/common';
 import { PasswordService } from '../auth/password.service';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAkunPetugasDto } from './akun-petugas.dto';
+import { AuthAuditService } from '../auth/audit/auth-audit.service';
 
 const metadata = {
   id: true,
@@ -23,6 +25,7 @@ export class AkunPetugasService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly password: PasswordService,
+    @Optional() private readonly sessionAudit?: AuthAuditService,
   ) {}
 
   list() {
@@ -61,6 +64,7 @@ export class AkunPetugasService {
   }
 
   async status(id: string, aktif: boolean, actorId: string) {
+    let revoked: number | null = null;
     const akun = await this.prisma.$transaction(async (tx) => {
       // Same row lock as assignment writes: account validity cannot change midway.
       await tx.$queryRaw`SELECT id FROM pengguna WHERE id = ${id}::uuid FOR UPDATE`;
@@ -75,11 +79,13 @@ export class AkunPetugasService {
         data: { aktif },
         select: metadata,
       });
-      if (!aktif)
-        await tx.sesiPengguna.updateMany({
+      if (!aktif) {
+        const sessions = await tx.sesiPengguna.updateMany({
           where: { penggunaId: id, dicabutPada: null },
           data: { dicabutPada: new Date() },
         });
+        revoked = sessions?.count ?? null;
+      }
       return result;
     });
     this.audit(
@@ -87,6 +93,18 @@ export class AkunPetugasService {
       id,
       actorId,
     );
+    if (!aktif) {
+      try {
+        await this.sessionAudit?.recordRevocation(
+          id,
+          actorId,
+          'ACCOUNT_DISABLED',
+          revoked,
+        );
+      } catch {
+        /* Revocation is already committed. */
+      }
+    }
     return akun;
   }
 

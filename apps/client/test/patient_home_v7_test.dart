@@ -449,7 +449,9 @@ void main() {
       final originalOwners = [...owners.created], initialReads = reads;
       final top = find.byKey(const ValueKey('patient-chrome-top'));
       final bottom = find.byKey(const ValueKey('patient-chrome-bottom'));
-      final list = find.byKey(const PageStorageKey('home-walk-in-list'));
+      final list = find.byKey(
+        const PageStorageKey('patient-home-walk-in-scroll'),
+      );
       final first = t.widget<PatientServiceTicketV8>(
         find.byType(PatientServiceTicketV8).first,
       );
@@ -481,7 +483,7 @@ void main() {
       await t.pumpAndSettle();
       expect(
         find.text(
-          'Notifikasi belum tersedia. Periksa status terbaru melalui Riwayat.',
+          'Notifikasi belum tersedia. Periksa status terbaru melalui Reservasi.',
         ),
         findsOneWidget,
       );

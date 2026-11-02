@@ -1,0 +1,7 @@
+Asset: staff_stethoscope_banner.png
+Generator: built-in image_gen (imagegen skill)
+Purpose: decorative header of the PETUGAS service panel; not clinical data.
+User authorization: 2 November 2026, requested AI-generated stethoscope illustration matching the reference.
+
+Final prompt:
+Use case: product-mockup. Asset type: decorative hospital dashboard panel banner. Create one polished photorealistic close-up illustration of a silver medical stethoscope with dark navy rubber tubing on blue medical fabric. Horizontal panoramic composition about 3:1: the stethoscope chestpiece is in the far right quarter, with tubing sweeping upward off the upper right edge. Left two-thirds are empty dark blue negative space, completely free of objects, for live UI text that will be placed in code. Palette blends from solid deep navy #203874 on the left to soft cobalt #4369B3 on the right. Realistic brushed steel reflections, soft studio lighting, calm professional hospital atmosphere. Edge-to-edge blue background, no white border. No text, letters, numbers, logos, watermark, people, body parts, extra equipment, or UI. This will sit behind the header of an existing patient queue service card; generate ONLY the background illustration, not a dashboard screenshot.

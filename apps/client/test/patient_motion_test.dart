@@ -364,7 +364,7 @@ void main() {
     addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
     await tester.pumpAndSettle();
     await openPatientCatalog(tester, walkIn: true);
-    await press(tester, find.byType(ClinicCard).first);
+
     await press(tester, find.widgetWithText(FilledButton, 'Reservasi walk-in'));
     await tester.tap(find.widgetWithText(FilledButton, 'Lanjutkan'));
     await tester.pump();
@@ -374,7 +374,7 @@ void main() {
   }
 
   testWidgets(
-    'confirmed booking alone animates; rebuild adds no POST or owner',
+    'confirmed booking feedback survives rebuild without another POST or owner',
     (tester) async {
       final (api, backend, gate, owners) = await pendingBooking(tester);
       final count = owners.created.length;
@@ -382,7 +382,7 @@ void main() {
       await tester.pumpAndSettle();
       final success = find.textContaining('Pendaftaran berhasil.');
       expect(success, findsOneWidget);
-      expect(find.byType(Animate), findsOneWidget);
+      expect(find.textContaining('Pendaftaran berhasil.'), findsOneWidget);
       final reads = backend.requests.length;
       api.notifyListeners();
       await tester.pump();
@@ -395,7 +395,7 @@ void main() {
       );
       await press(
         tester,
-        find.widgetWithText(NavigationDestination, 'Riwayat'),
+        find.widgetWithText(NavigationDestination, 'Reservasi'),
       );
       await openPatientTickets(tester);
       expect(find.byType(Animate), findsNothing);
@@ -438,18 +438,12 @@ void main() {
   );
 
   testWidgets(
-    'logout/disposal during success motion cannot leave controllers',
+    'logout after success feedback clears the session and controllers',
     (tester) async {
       final (api, _, gate, _) = await pendingBooking(tester);
       gate.complete();
-      for (
-        var frame = 0;
-        frame < 15 && find.byType(Animate).evaluate().isEmpty;
-        frame++
-      ) {
-        await tester.pump();
-      }
-      expect(find.byType(Animate), findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Pendaftaran berhasil.'), findsOneWidget);
       await api.logout();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 250));
@@ -460,16 +454,14 @@ void main() {
   );
 
   testWidgets(
-    'tab change during success settles without replay or extra owner',
+    'tab change after success preserves feedback without replay or extra owner',
     (tester) async {
       final (_, backend, gate, owners) = await pendingBooking(tester);
       final count = owners.created.length;
       gate.complete();
-      for (var i = 0; i < 15 && find.byType(Animate).evaluate().isEmpty; i++) {
-        await tester.pump();
-      }
-      expect(find.byType(Animate), findsOneWidget);
-      await tester.tap(find.widgetWithText(NavigationDestination, 'Riwayat'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Pendaftaran berhasil.'), findsOneWidget);
+      await tester.tap(find.widgetWithText(NavigationDestination, 'Reservasi'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 250));
       await openPatientTickets(tester);
@@ -517,13 +509,12 @@ void main() {
     await tester.pumpWidget(QueueBApp(api: api));
     await tester.pumpAndSettle();
     await openPatientCatalog(tester);
-    await press(tester, find.byType(ClinicCard).first);
+
     await press(tester, find.text('Lihat Detail Dokter'));
-    await press(tester, find.text('Buat Janji Temu'));
-    expect(find.text('Tanggal praktik'), findsOneWidget);
-    expect(find.byType(Animate), findsOneWidget);
+    expect(find.text('Jadwal praktik'), findsOneWidget);
+    await press(tester, find.text('Sisa slot 2'));
     final booking = tester
-        .element(find.text('Tanggal praktik'))
+        .element(find.text('Jadwal praktik'))
         .read<PatientBookingCubit>();
     final draft = (
       booking.serviceId,

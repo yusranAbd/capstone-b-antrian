@@ -61,7 +61,7 @@ void main() {
       final overview = context.read<PatientOverviewCubit>(),
           booking = context.read<PatientBookingCubit>(),
           visits = context.read<PatientReservationsCubit>();
-      for (final label in ['Riwayat', 'Informasi', 'Profil', 'Beranda']) {
+      for (final label in ['Reservasi', 'Informasi', 'Profil', 'Beranda']) {
         final target = find.widgetWithText(NavigationDestination, label).last;
         await tester.ensureVisible(target);
         await tester.tap(target);

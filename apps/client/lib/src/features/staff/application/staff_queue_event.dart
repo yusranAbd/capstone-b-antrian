@@ -33,11 +33,12 @@ final class StaffPageSelected extends StaffQueueEvent {
 
 /// QR is transient command input, redacted from diagnostics and consumed once.
 final class StaffCommand extends StaffQueueEvent {
-  StaffCommand(this.operation, {this.ticketId, String? qr}) {
+  StaffCommand(this.operation, {this.ticketId, this.alasan, String? qr}) {
     _qr = qr;
   }
   final StaffOperation operation;
   final String? ticketId;
+  final String? alasan;
   String? _qr;
   String? takeQr() {
     final value = _qr;

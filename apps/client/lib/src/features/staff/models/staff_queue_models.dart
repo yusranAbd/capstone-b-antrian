@@ -9,12 +9,19 @@ enum StaffOperation {
   requeue('antre-ulang', 'MENUNGGU'),
   start('mulai-pelayanan', 'DILAYANI'),
   complete('selesaikan-pelayanan', 'SELESAI'),
+  cancelEnded('batalkan-sesi-berakhir', 'DIBATALKAN'),
   enqueue('masuk', 'MENUNGGU'),
   scan('auto-antrean', 'MENUNGGU');
 
   const StaffOperation(this.route, this.expectedStatus);
   final String route, expectedStatus;
 }
+
+const staffEndedSessionReasons = {
+  'LAYANAN_TIDAK_DAPAT_DILANJUTKAN': 'Layanan tidak dapat dilanjutkan',
+  'DOKTER_BERHALANGAN': 'Dokter berhalangan',
+  'PASIEN_MEMILIH_BATAL': 'Pasien memilih batal',
+};
 
 Json staffObject(dynamic value) {
   if (value is! Map) {

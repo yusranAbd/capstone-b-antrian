@@ -4,11 +4,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import { ModeReservasi, PeranPengguna, Prisma } from '../generated/prisma/client';
+import {
+  ModeReservasi,
+  PeranPengguna,
+  Prisma,
+} from '../generated/prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateLayananDto } from './dto/create-layanan.dto';
 import { UpdateLayananDto } from './dto/update-layanan.dto';
+import { kategoriDariKode } from './kategori-layanan';
 
 @Injectable()
 export class LayananService {
@@ -24,6 +29,7 @@ export class LayananService {
         data: {
           kode: dto.kode,
           nama: dto.nama.trim(),
+          kategori: dto.kategori ?? kategoriDariKode(dto.kode),
           deskripsi: dto.deskripsi ?? null,
           prefixAntrean: dto.prefixAntrean,
           durasiDasarMenit: dto.durasiDasarMenit,
@@ -88,6 +94,7 @@ export class LayananService {
         data: {
           kode: dto.kode,
           nama: dto.nama !== undefined ? dto.nama.trim() : undefined,
+          kategori: dto.kategori,
           deskripsi: dto.deskripsi,
           prefixAntrean: dto.prefixAntrean,
           durasiDasarMenit: dto.durasiDasarMenit,

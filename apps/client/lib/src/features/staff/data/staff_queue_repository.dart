@@ -137,6 +137,7 @@ class StaffQueueRepository extends ChangeNotifier {
     String room, {
     String? ticketId,
     String? qr,
+    String? alasan,
   }) async {
     check();
     if (_writing) throw const ApiException(409, 'Tunggu proses sebelumnya.');
@@ -154,6 +155,7 @@ class StaffQueueRepository extends ChangeNotifier {
           body: {
             'loketId': room,
             if (operation == StaffOperation.scan) 'qrPayload': qr,
+            if (operation == StaffOperation.cancelEnded) 'alasan': alasan,
           },
         ),
       );

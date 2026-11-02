@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:queueb_client/src/config.dart';
 import 'package:queueb_client/src/doctor_dashboard.dart';
 import 'package:queueb_client/src/doctor_visual.dart';
+import 'package:queueb_client/src/doctor_professional.dart';
 import 'package:timezone/data/latest.dart' as tz;
 
 void main() {
@@ -59,7 +60,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(find.byType(DoctorAvatar), findsOneWidget);
+        expect(find.byType(ProfessionalDoctorAvatar), findsOneWidget);
         expect(find.byType(NavigationRail), findsNothing);
         expect(find.byType(Drawer), findsNothing);
         expect(find.text('0'), findsNWidgets(2));
@@ -73,7 +74,9 @@ void main() {
           final live = tester.getTopLeft(find.byType(DoctorLivePanel));
           expect(live.dy, closeTo(queue.dy, 1));
           expect(live.dx, greaterThan(queue.dx));
-          final profile = tester.getTopLeft(find.byType(DoctorAvatar));
+          final profile = tester.getTopLeft(
+            find.byType(ProfessionalDoctorAvatar),
+          );
           expect(
             tester.getTopLeft(find.text('Janji Hari Ini')).dy - profile.dy,
             lessThan(50),
@@ -97,7 +100,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Realtime terhubung'), findsWidgets);
         await tester.scrollUntilVisible(
-          find.text('Catatan Klinis Dokter'),
+          find.text('Jadwal Praktik Hari Ini'),
           250,
           scrollable: find.byType(Scrollable).first,
         );
@@ -105,16 +108,77 @@ void main() {
           find.text('Tidak ada jadwal untuk tanggal pilihan.'),
           findsOneWidget,
         );
-        expect(
-          find.text('Pencatatan klinis belum tersedia di QueueB.'),
-          findsOneWidget,
-        );
+        expect(find.text('Catatan Klinis Dokter'), findsNothing);
         expect(find.text('Mulai Konsultasi'), findsNothing);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox());
       },
     );
   }
+  testWidgets(
+    'Compact empty laptop dashboard reveals lower sections without scrolling',
+    (tester) async {
+      tester.view.physicalSize = const Size(1366, 768);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final status = ValueNotifier('Realtime terhubung');
+      addTearDown(status.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: DoctorStyle.theme,
+          home: Scaffold(
+            appBar: AppBar(
+              toolbarHeight: 64,
+              title: const Text('QueueB Hospital'),
+            ),
+            body: DoctorDashboard(
+              config: config,
+              date: config.today,
+              profile: const {
+                'nama': 'Dokter Pengujian',
+                'spesialisasi': 'Penyakit Dalam',
+                'poliklinik': [
+                  {'nama': 'Poli Penyakit Dalam'},
+                ],
+              },
+              schedules: const [],
+              appointments: const [],
+              snapshots: const [],
+              loading: false,
+              available: true,
+              status: status,
+              onRefresh: () async {},
+              onPickDate: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.getSize(find.byType(DoctorQueueEmpty)).height,
+        lessThan(80),
+      );
+      expect(
+        tester.getSize(find.byType(DoctorLivePanel)).height,
+        lessThan(360),
+      );
+      expect(
+        tester.getTopLeft(find.text('Jadwal Praktik Hari Ini')).dy,
+        lessThan(768),
+      );
+      expect(
+        tester
+            .widget<ProfessionalDoctorAvatar>(
+              find.byType(ProfessionalDoctorAvatar),
+            )
+            .radius,
+        30,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
   testWidgets(
     'Generic avatar provides a local fallback when image is unavailable',
     (tester) async {

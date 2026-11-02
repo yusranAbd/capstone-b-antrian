@@ -227,18 +227,21 @@ class _UserProfilePageState extends State<UserProfilePage> {
     super.dispose();
   }
 
-  Widget note(String text, {bool danger = false}) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: Semantics(
-      liveRegion: true,
-      child: Text(
-        text,
-        style: TextStyle(
-          color: danger ? QueueBStyle.danger : QueueBStyle.darkTeal,
-        ),
-      ),
-    ),
-  );
+  Widget note(String text, {bool danger = false, bool success = false}) =>
+      danger || success
+      ? MobileNotice(text, error: danger, success: success)
+      : Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Semantics(
+            liveRegion: true,
+            child: Text(
+              text,
+              style: TextStyle(
+                color: danger ? QueueBStyle.danger : QueueBStyle.darkTeal,
+              ),
+            ),
+          ),
+        );
   Widget title(String text, String subtitle) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
@@ -808,7 +811,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                   ),
                                 if (error != null) note(error!, danger: true),
                                 if (message != null && message!.isNotEmpty)
-                                  note(message!),
+                                  note(message!, success: true),
                                 if (!loading)
                                   switch (selected) {
                                     0 => personal(),

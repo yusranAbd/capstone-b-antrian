@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'patient_design.dart';
+import 'queueb_feedback.dart';
 import 'queueb_palette.dart';
 
 abstract final class QueueBStyle {
@@ -112,23 +113,34 @@ abstract final class QueueBStyle {
 }
 
 class QueueBBrand extends StatelessWidget {
-  const QueueBBrand({super.key, this.compact = false});
+  const QueueBBrand({
+    super.key,
+    this.compact = false,
+    this.onDark = false,
+    this.fontSize,
+    this.logoSize,
+  });
   final bool compact;
+  final bool onDark;
+  final double? fontSize;
+  final double? logoSize;
   @override
   Widget build(BuildContext context) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
       Container(
-        width: compact ? 32 : 48,
-        height: compact ? 32 : 48,
+        width: logoSize ?? (compact ? 32 : 48),
+        height: logoSize ?? (compact ? 32 : 48),
         decoration: BoxDecoration(
-          color: QueueBStyle.teal,
-          borderRadius: BorderRadius.circular(compact ? 10 : 16),
+          color: onDark ? Colors.white : QueueBStyle.teal,
+          borderRadius: BorderRadius.circular(
+            onDark ? 12 : (compact ? 10 : 16),
+          ),
         ),
         child: Icon(
           Icons.local_hospital_rounded,
-          color: Colors.white,
-          size: compact ? 23 : 36,
+          color: onDark ? QueueBStyle.teal : Colors.white,
+          size: logoSize == null ? (compact ? 23 : 36) : logoSize! * .76,
         ),
       ),
       const SizedBox(width: 10),
@@ -136,20 +148,29 @@ class QueueBBrand extends StatelessWidget {
         child: Text.rich(
           TextSpan(
             children: [
-              const TextSpan(
+              TextSpan(
                 text: 'QueueB',
-                style: TextStyle(color: QueueBStyle.navy),
+                style: TextStyle(
+                  color: onDark ? Colors.white : QueueBStyle.navy,
+                ),
               ),
               TextSpan(
                 text: compact ? ' Hospital' : '\nHospital',
-                style: const TextStyle(color: QueueBStyle.darkTeal),
+                style: TextStyle(
+                  color: onDark
+                      ? const Color(0xffa7ceff)
+                      : QueueBStyle.darkTeal,
+                ),
               ),
             ],
           ),
+          maxLines: onDark ? 1 : null,
+          overflow: onDark ? TextOverflow.ellipsis : null,
           style: TextStyle(
-            fontSize: compact ? 18 : 30,
+            fontSize: fontSize ?? (compact ? 18 : 30),
             height: 1.05,
             fontWeight: FontWeight.w800,
+            letterSpacing: onDark ? -.5 : null,
           ),
         ),
       ),
@@ -297,31 +318,46 @@ class ClinicCard extends StatelessWidget {
 }
 
 class MobileNotice extends StatelessWidget {
-  const MobileNotice(this.text, {super.key, this.error = false});
+  const MobileNotice(
+    this.text, {
+    super.key,
+    this.error = false,
+    this.success = false,
+    this.popup = false,
+  });
   final String text;
-  final bool error;
+  final bool error, success, popup;
   @override
-  Widget build(BuildContext context) => Container(
-    width: double.infinity,
-    margin: const EdgeInsets.symmetric(vertical: 8),
-    padding: const EdgeInsets.all(QueueBStyle.space),
-    decoration: BoxDecoration(
-      color: error
-          ? Theme.of(context).colorScheme.errorContainer
-          : (PatientDesign.active(context)
-                ? PatientDesign.soft
-                : QueueBStyle.mint),
-      borderRadius: BorderRadius.circular(16),
-    ),
-    child: SelectableText(
-      text,
-      style: TextStyle(
-        color: error
-            ? Theme.of(context).colorScheme.onErrorContainer
-            : (PatientDesign.active(context)
-                  ? PatientDesign.ink
-                  : QueueBStyle.navy),
-      ),
-    ),
-  );
+  Widget build(BuildContext context) => error || success || popup
+      ? QueueBPopupNotice(
+          text,
+          kind: error
+              ? QueueBFeedbackKind.error
+              : success
+              ? QueueBFeedbackKind.success
+              : QueueBFeedbackKind.info,
+        )
+      : Container(
+          width: double.infinity,
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.all(QueueBStyle.space),
+          decoration: BoxDecoration(
+            color: error
+                ? Theme.of(context).colorScheme.errorContainer
+                : (PatientDesign.active(context)
+                      ? PatientDesign.soft
+                      : QueueBStyle.mint),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: SelectableText(
+            text,
+            style: TextStyle(
+              color: error
+                  ? Theme.of(context).colorScheme.onErrorContainer
+                  : (PatientDesign.active(context)
+                        ? PatientDesign.ink
+                        : QueueBStyle.navy),
+            ),
+          ),
+        );
 }

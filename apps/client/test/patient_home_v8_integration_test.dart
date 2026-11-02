@@ -97,7 +97,7 @@ void main() {
           hasLength(1),
         );
         if (fail) {
-          expect(find.text('Jam & petugas belum tersedia'), findsOneWidget);
+          expect(find.textContaining('Jam belum tersedia'), findsOneWidget);
         } else {
           expect(find.textContaining('08.00–16.00'), findsOneWidget);
         }

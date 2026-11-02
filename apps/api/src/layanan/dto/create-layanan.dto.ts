@@ -10,9 +10,13 @@ import {
   MinLength,
   ValidateIf,
 } from 'class-validator';
-import { ModeReservasi } from '../../generated/prisma/client';
+import { KategoriLayanan, ModeReservasi } from '../../generated/prisma/client';
 
 export class CreateLayananDto {
+  @ValidateIf((_, value: unknown) => value !== undefined)
+  @IsEnum(KategoriLayanan)
+  kategori?: KategoriLayanan;
+
   @ValidateIf((_, value: unknown) => value !== undefined)
   @IsEnum(ModeReservasi)
   modeReservasi?: ModeReservasi;

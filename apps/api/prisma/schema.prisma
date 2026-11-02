@@ -40,6 +40,19 @@ enum ModeReservasi {
   @@map("mode_reservasi")
 }
 
+enum KategoriLayanan {
+  POLIKLINIK
+  PENDAFTARAN
+  APOTEK
+  LABORATORIUM
+  RADIOLOGI
+  KASIR
+  REKAM_MEDIS
+  LAINNYA
+
+  @@map("kategori_layanan")
+}
+
 enum HariLayanan {
   SENIN
   SELASA
@@ -62,6 +75,7 @@ enum JenisNotifikasi {
 }
 
 model Pengguna {
+  auditRef       String @unique @default(dbgenerated("gen_random_uuid()")) @map("audit_ref") @db.Uuid
   avatarProfil String? @map("avatar_profil") @db.VarChar(200)
   id             String        @id @default(uuid()) @db.Uuid
   nama           String        @db.VarChar(150)
@@ -86,6 +100,7 @@ model Layanan {
   id               String   @id @default(uuid()) @db.Uuid
   kode             String   @unique @db.VarChar(20)
   nama             String   @db.VarChar(150)
+  kategori         KategoriLayanan @default(POLIKLINIK)
   deskripsi        String?  @db.Text
   prefixAntrean    String   @map("prefix_antrean") @db.VarChar(5)
   modeReservasi    ModeReservasi @default(ANTREAN_HARIAN) @map("mode_reservasi")
@@ -261,6 +276,7 @@ model PerangkatTampilan {
 }
 
 model SesiPengguna {
+  auditRef         String @unique @default(dbgenerated("gen_random_uuid()")) @map("audit_ref") @db.Uuid
   id               String    @id @default(uuid()) @db.Uuid
   penggunaId       String    @map("pengguna_id") @db.Uuid
   tokenRefreshHash String    @unique @map("token_refresh_hash") @db.VarChar(255)
@@ -277,6 +293,7 @@ model SesiPengguna {
 }
 
 model Notifikasi {
+  peristiwaAntreanId String? @unique @map("peristiwa_antrean_id") @db.Uuid
   id             String          @id @default(uuid()) @db.Uuid
   penggunaId     String          @map("pengguna_id") @db.Uuid
   tiketAntreanId String?         @map("tiket_antrean_id") @db.Uuid
@@ -292,7 +309,29 @@ model Notifikasi {
   @@index([penggunaId])
   @@index([tiketAntreanId])
   @@index([dibacaPada])
+  @@index([penggunaId, dibuatPada, id], map: "idx_notifikasi_inbox")
   @@map("notifikasi")
+}
+
+// Pseudonymous references only: never credentials, raw account/session IDs or IP/UA.
+model AuditSesi {
+  id          String @id @default(uuid()) @db.Uuid
+  requestId   String @map("request_id") @db.Uuid
+  akunRef     String? @map("akun_ref") @db.Uuid
+  aktorRef    String? @map("aktor_ref") @db.Uuid
+  sesiRef     String? @map("sesi_ref") @db.Uuid
+  aksi        String @db.VarChar(20)
+  hasil       String @db.VarChar(12)
+  alasan      String @db.VarChar(40)
+  klien       String @db.VarChar(16)
+  sumber      String @default("UNKNOWN") @db.VarChar(16)
+  jumlahSesi  Int? @map("jumlah_sesi")
+  terjadiPada DateTime @default(now()) @map("terjadi_pada") @db.Timestamptz(6)
+
+  @@index([terjadiPada, id])
+  @@index([akunRef, terjadiPada])
+  @@index([sesiRef, terjadiPada])
+  @@map("audit_sesi")
 }
 
 // ============================================================

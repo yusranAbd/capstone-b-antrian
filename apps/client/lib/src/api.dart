@@ -199,6 +199,14 @@ class QueueApi extends ChangeNotifier {
     }
     request.headers.addAll({
       'Accept': 'application/json',
+      if (path.startsWith('/auth/') || path == '/audit-sesi')
+        'x-queueb-client': kIsWeb
+            ? 'WEB'
+            : switch (defaultTargetPlatform) {
+                TargetPlatform.android => 'ANDROID',
+                TargetPlatform.iOS => 'IOS',
+                _ => 'DESKTOP',
+              },
       if (body != null) 'Content-Type': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',
       'x-display-token': ?displayToken,

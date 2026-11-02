@@ -12,7 +12,7 @@ import 'package:queueb_client/src/api.dart';
 import 'package:queueb_client/src/app.dart';
 import 'package:queueb_client/src/config.dart';
 import 'package:queueb_client/src/doctor_schedule_ui.dart';
-import 'package:queueb_client/src/mobile_ui.dart';
+import 'package:queueb_client/src/patient_ui.dart';
 
 import 'ui_test.dart' show FakeBackend, uid;
 
@@ -104,18 +104,21 @@ void main() {
     await tester.pumpWidget(QueueBApp(api: api));
     await tester.pumpAndSettle();
     await openPatientCatalog(tester);
-    await press(tester, find.byType(ClinicCard).first);
     return api;
   }
 
+  Finder practiceDay(String date) => find.byWidgetPredicate(
+    (w) =>
+        w is Semantics &&
+        w.properties.button == true &&
+        (w.properties.label?.contains(patientDate(date)) ?? false),
+  );
   Future<void> detail(WidgetTester tester) async {
     await press(tester, find.text('Lihat Detail Dokter'));
-    await press(tester, find.text('Buat Janji Temu'));
   }
 
   Future<void> slot(WidgetTester tester) async {
     await detail(tester);
-    await press(tester, find.text('Lihat slot'));
   }
 
   test(
@@ -148,14 +151,15 @@ void main() {
       await open(tester, backend, width: width);
       expect(find.text('Tersedia Hari Ini'), findsNothing);
       await slot(tester);
-      expect(find.byType(PracticeDateStrip), findsOneWidget);
+      expect(practiceDay(backend.today), findsOneWidget);
+      expect(practiceDay(backend.tomorrow), findsOneWidget);
       expect(find.text('09:00 – 09:15'), findsOneWidget);
       expect(find.text('Sisa slot 2'), findsOneWidget);
       await press(tester, find.text('Sisa slot 2'));
       expect(
         tester
             .widget<FilledButton>(
-              find.widgetWithText(FilledButton, 'Lanjutkan'),
+              find.widgetWithText(FilledButton, 'Lanjutkan Reservasi'),
             )
             .onPressed,
         isNotNull,
@@ -173,9 +177,11 @@ void main() {
     });
   }
 
-  testWidgets('clinic-name search keeps its doctors visible', (tester) async {
+  testWidgets('doctor-name search keeps the matching clinician visible', (
+    tester,
+  ) async {
     await open(tester, DoctorBackend());
-    await tester.enterText(find.byType(TextField).first, 'Poli Umum');
+    await tester.enterText(find.byType(TextField).first, 'Dokter Umum');
     await tester.pumpAndSettle();
     await press(tester, find.text('Lihat Detail Dokter'));
     expect(find.byType(DoctorProfileCard), findsOneWidget);
@@ -190,15 +196,18 @@ void main() {
       await press(tester, find.text('Sisa slot 2'));
       await tester.drag(find.byType(Scrollable).first, const Offset(0, 4000));
       await tester.pumpAndSettle();
-      final strip = tester.widget<PracticeDateStrip>(
-        find.byType(PracticeDateStrip),
-      );
-      expect(strip.dates, [backend.today, backend.tomorrow]);
-      strip.onChanged(backend.tomorrow);
+      expect(practiceDay(backend.today), findsOneWidget);
+      expect(practiceDay(backend.tomorrow), findsOneWidget);
+      await press(tester, practiceDay(backend.tomorrow));
       await tester.pumpAndSettle();
       expect(backend.queries.last['tanggal'], backend.tomorrow);
-      expect(find.byType(ConsultationSlotGrid), findsNothing);
-      await press(tester, find.text('Lanjutkan'));
+      expect(
+        tester
+            .widget<ConsultationSlotGrid>(find.byType(ConsultationSlotGrid))
+            .value,
+        isNull,
+      );
+      await press(tester, find.text('Lanjutkan Reservasi'));
       expect(
         backend.requests.where((r) => r.$1 == 'POST' && r.$2 == '/janji-temu'),
         isEmpty,
@@ -206,29 +215,20 @@ void main() {
     },
   );
 
-  testWidgets(
-    'calendar picker restricts selectable dates to backend practice DATE',
-    (tester) async {
-      final backend = DoctorBackend();
-      await open(tester, backend);
-      await detail(tester);
-      await press(tester, find.text('Kalender · ${backend.today}'));
-      final dialog = tester.widget<DatePickerDialog>(
-        find.byType(DatePickerDialog),
-      );
-      expect(
-        dialog.selectableDayPredicate!(DateTime.parse(backend.today)),
-        isTrue,
-      );
-      expect(
-        dialog.selectableDayPredicate!(
-          DateTime.parse(backend.tomorrow).add(const Duration(days: 1)),
-        ),
-        isFalse,
-      );
-      expect(tester.takeException(), isNull);
-    },
-  );
+  testWidgets('native date choices are restricted to backend practice DATE', (
+    tester,
+  ) async {
+    final backend = DoctorBackend();
+    await open(tester, backend);
+    await detail(tester);
+    expect(practiceDay(backend.today), findsOneWidget);
+    expect(practiceDay(backend.tomorrow), findsOneWidget);
+    final absent = calendarDate(
+      DateTime.parse(backend.tomorrow).add(const Duration(days: 1)),
+    );
+    expect(practiceDay(absent), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'empty practice and server failure provide recovery without fake dates',
@@ -236,7 +236,7 @@ void main() {
       final backend = DoctorBackend()..emptySchedule = true;
       await open(tester, backend);
       await detail(tester);
-      expect(find.byType(PracticeDateStrip), findsNothing);
+      expect(practiceDay(backend.today), findsNothing);
       await press(tester, find.text('Muat ulang jadwal'));
       expect(
         find.textContaining('Dokter belum memiliki jadwal'),
@@ -272,7 +272,6 @@ void main() {
       backend.emptyDoctors = false;
       await press(tester, find.text('Beranda'));
       await openPatientCatalog(tester);
-      await press(tester, find.byType(ClinicCard).first);
       // Reconcile through existing foreground lifecycle, not a second socket.
       for (final state in [
         AppLifecycleState.inactive,
@@ -319,7 +318,7 @@ void main() {
       expect(
         tester
             .widget<FilledButton>(
-              find.widgetWithText(FilledButton, 'Lanjutkan'),
+              find.widgetWithText(FilledButton, 'Lanjutkan Reservasi'),
             )
             .onPressed,
         isNull,
@@ -354,7 +353,7 @@ void main() {
       backend.scheduleGate!.complete();
       await tester.pumpAndSettle();
       expect(find.byType(DoctorProfileCard), findsNothing);
-      expect(find.byType(PracticeDateStrip), findsNothing);
+      expect(practiceDay(backend.today), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -366,7 +365,7 @@ void main() {
       await open(tester, backend);
       await slot(tester);
       await press(tester, find.text('Sisa slot 2'));
-      await press(tester, find.text('Lanjutkan'));
+      await press(tester, find.text('Lanjutkan Reservasi'));
       await press(tester, find.text('Konfirmasi Janji Temu').last);
       expect(
         backend.requests
@@ -387,13 +386,13 @@ void main() {
       expect(
         tester
             .widget<FilledButton>(
-              find.widgetWithText(FilledButton, 'Lanjutkan'),
+              find.widgetWithText(FilledButton, 'Lanjutkan Reservasi'),
             )
             .onPressed,
         isNull,
       );
       expect(
-        find.text('Seluruh slot penuh. Pilih sesi atau tanggal lain.'),
+        find.text('Seluruh slot penuh. Pilih tanggal atau sesi lain.'),
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);

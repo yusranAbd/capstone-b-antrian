@@ -23,6 +23,7 @@ import { PeranPengguna } from '../generated/prisma/client';
 import { CreateLayananDto } from './dto/create-layanan.dto';
 import { UpdateLayananDto } from './dto/update-layanan.dto';
 import { LayananService } from './layanan.service';
+import { LayananReadinessService } from './layanan-readiness.service';
 import { PatientQueueQueryDto } from './dto/patient-queue-query.dto';
 import { PatientQueueSummaryService } from './patient-queue-summary.service';
 
@@ -32,6 +33,7 @@ export class LayananController {
   constructor(
     private readonly layananService: LayananService,
     private readonly patientQueue: PatientQueueSummaryService,
+    private readonly readiness: LayananReadinessService,
   ) {}
 
   // =====================================
@@ -62,6 +64,13 @@ export class LayananController {
   @Header('Cache-Control', 'no-store')
   patientSummary(@Query() query: PatientQueueQueryDto) {
     return this.patientQueue.snapshot(query);
+  }
+
+  @Get('kesiapan')
+  @Roles(PeranPengguna.ADMIN)
+  @Header('Cache-Control', 'no-store')
+  configurationReadiness() {
+    return this.readiness.snapshot();
   }
 
   @Get(':id')

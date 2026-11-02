@@ -203,15 +203,12 @@ void main() {
         expect(find.byType(NavigationBar), findsNothing);
         expect(find.text('M-007'), findsWidgets);
         await tester.scrollUntilVisible(
-          find.text('Catatan Klinis Dokter'),
+          find.text('Jadwal Praktik Hari Ini'),
           300,
           scrollable: find.byType(Scrollable).first,
         );
         expect(find.text('Jadwal Praktik Hari Ini'), findsOneWidget);
-        expect(
-          find.text('Pencatatan klinis belum tersedia di QueueB.'),
-          findsOneWidget,
-        );
+        expect(find.text('Catatan Klinis Dokter'), findsNothing);
         for (final action in [
           'Mulai Konsultasi',
           'Selesai Konsultasi',

@@ -13,7 +13,6 @@ import 'package:queueb_client/src/api.dart';
 import 'package:queueb_client/src/app.dart';
 import 'package:queueb_client/src/config.dart';
 import 'package:queueb_client/src/staff_qr_scanner.dart';
-import 'package:queueb_client/src/mobile_ui.dart';
 import 'package:queueb_client/src/patient_reservations.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -322,11 +321,11 @@ void main() {
     (tester) async {
       await launch(tester, FakeBackend('USER'));
       await openPatientCatalog(tester, walkIn: true);
-      await tester.tap(find.byType(ClinicCard).first);
+
       await tester.pumpAndSettle();
       for (final input in ['2020-01-01', '2099-12-31', 'tidak valid']) {
         await tester.enterText(
-          find.widgetWithText(TextField, 'Tanggal pelayanan (YYYY-MM-DD)'),
+          find.widgetWithText(TextField, 'Tanggal pelayanan'),
           input,
         );
         await tester.tap(find.byTooltip('Pilih tanggal pelayanan'));
@@ -510,10 +509,8 @@ void main() {
   ) async {
     final server = FakeBackend('USER', mode: 'ANTREAN_HARIAN');
     await launch(tester, server, size: const Size(390, 844));
-    await press(tester, 'Riwayat');
-    await press(tester, 'Buat Reservasi');
-    await press(tester, 'Pilih Poliklinik');
-    await tester.tap(find.byType(ClinicCard).first);
+    await openPatientCatalog(tester, walkIn: true);
+
     await tester.pumpAndSettle();
     await press(tester, 'Reservasi walk-in');
     await press(tester, 'Lanjutkan');
@@ -529,12 +526,11 @@ void main() {
           .length,
       1,
     );
-    final technical = find.text('Detail teknis tiket');
-    await tester.ensureVisible(technical);
-    await tester.pumpAndSettle();
-    await tester.tap(technical);
-    await tester.pumpAndSettle();
-    expect(find.text('SQ1.fixture'), findsOneWidget);
+    // The transient token is never rendered as patient-readable text.
+    expect(find.text('Detail teknis tiket'), findsNothing);
+    expect(find.text('SQ1.fixture'), findsNothing);
+    expect(find.text('Unduh PDF'), findsOneWidget);
+    expect(find.text('Cetak Tiket'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await press(tester, 'Tutup');
   });
@@ -543,10 +539,8 @@ void main() {
     (tester) async {
       final server = FakeBackend('USER');
       await launch(tester, server);
-      await press(tester, 'Riwayat');
-      await press(tester, 'Buat Reservasi');
-      await press(tester, 'Pilih Poliklinik');
-      await tester.tap(find.byType(ClinicCard).first);
+      await openPatientCatalog(tester);
+
       await tester.pumpAndSettle();
       await press(tester, 'Lihat Detail Dokter');
       // The single available session automatically loads slots in Detail Dokter.
@@ -562,7 +556,7 @@ void main() {
             .$3,
         {'slotPraktikId': uid},
       );
-      await press(tester, 'Riwayat');
+      await press(tester, 'Reservasi');
       await press(tester, 'Batalkan Reservasi');
       await press(tester, 'Ya, Batalkan');
       expect(
@@ -615,7 +609,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
-  testWidgets('Patient home navigation, empty tickets and catalog search', (
+  testWidgets('Patient home navigation, empty tickets and doctor search', (
     tester,
   ) async {
     await launch(tester, FakeBackend('USER'), size: const Size(375, 812));
@@ -624,18 +618,20 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Akun USER'), findsOneWidget);
-    await openPatientCatalog(tester);
+    await press(tester, 'Reservasi');
+    await press(tester, 'Buat Reservasi');
+    await press(tester, 'Cari Dokter');
     expect(find.text('Buat Reservasi'), findsOneWidget);
     await tester.enterText(
-      find.widgetWithText(TextField, 'Cari poliklinik atau dokter'),
+      find.widgetWithText(
+        TextField,
+        'Cari dokter, poliklinik, atau spesialisasi...',
+      ),
       'Tidak ada',
     );
     await tester.pumpAndSettle();
-    expect(
-      find.text('Tidak ada poliklinik yang sesuai pencarian.'),
-      findsOneWidget,
-    );
-    await press(tester, 'Riwayat');
+    expect(find.text('Tidak ada dokter yang sesuai.'), findsOneWidget);
+    await press(tester, 'Reservasi');
     expect(find.text('Belum ada reservasi yang sesuai.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -643,7 +639,7 @@ void main() {
     testWidgets('Mobile home layout at width $width', (tester) async {
       await launch(tester, FakeBackend('USER'), size: Size(width, 900));
       expect(tester.takeException(), isNull);
-      await press(tester, 'Riwayat');
+      await press(tester, 'Reservasi');
       expect(tester.takeException(), isNull);
       expect(find.byTooltip('Keluar akun'), findsNothing);
       await tester.tap(find.widgetWithText(NavigationDestination, 'Profil'));
@@ -700,7 +696,7 @@ void main() {
       final server = FakeBackend('USER')..status = status;
       server.tickets.add(server.ticket);
       await launch(tester, server, size: const Size(320, 900));
-      await press(tester, 'Riwayat');
+      await press(tester, 'Reservasi');
       // Riwayat also contains a status filter chip labelled Dipesan/Selesai.
       // Verify the authoritative ticket badge inside the owned card instead.
       final card = find.byKey(ValueKey('reservation-$uid'));
@@ -750,7 +746,7 @@ void main() {
       final server = FakeBackend('USER')..slotsAvailable = false;
       await launch(tester, server, size: const Size(375, 900));
       await openPatientCatalog(tester);
-      await tester.tap(find.byType(ClinicCard).first);
+
       await tester.pumpAndSettle();
       await press(tester, 'Lihat Detail Dokter');
       expect(find.byTooltip('Kembali'), findsOneWidget);

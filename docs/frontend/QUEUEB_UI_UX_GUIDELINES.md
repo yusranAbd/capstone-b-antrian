@@ -60,7 +60,7 @@ Beranda memakai tab **Ambil Antrean** (default) dan **Janji Temu** melalui TabBa
 
 Aksen Beranda kembali memakai palet periwinkle bersama: primary #4C60CC, hero #4169D5, soft #EEF1FF, background #F2F5FF dan putih. Kartu kunjungan dipulihkan ke komposisi sebelum V6 (baseline de56b16), dengan identitas dokter, badge status, nomor antrean dan fakta kunjungan. Nama/status/tanggal/ruang/nomor berasal dari proyeksi REST existing; kartu hilang seluruhnya bila tidak ada kunjungan relevan. QR berupa aksi untuk workflow penerbitan existing, bukan gambar QR dekoratif pada kartu.
 
-Revisi pengguna memisahkan kategori tampilan dari mode booking. Ambil Antrean hanya untuk layanan pendukung dengan kode PENDAFTARAN, REGISTRASI, ADMINISTRASI, APOTEK atau APOTIK yang aktif dan mendukung ANTREAN_HARIAN/HIBRIDA. Seluruh poliklinik tampil di penjelajahan Janji Temu, termasuk poli ANTREAN_HARIAN; label dan aksi tetap mengikuti mode server, sehingga poli harian tidak dipaksa menjadi appointment. Karena API belum memiliki field kategori, daftar kode eksplisit merupakan konvensi presentasi, bukan data katalog hardcoded. Nilai mode tidak dikenal tidak diasumsikan dapat dipesan. Jangan menampilkan kuota tersedia atau estimasi dari keberadaan layanan saja. Klik membuka formulir/detail existing; mutasi tetap membutuhkan konfirmasi. [Implementasi dan QA V6](PATIENT_HOME_V6.md).
+Revisi 2 November 2026 memisahkan kategori tampilan dari kode dan mode booking melalui field API `kategori`. Ambil Antrean menampilkan kategori pendukung aktif (Pendaftaran, Apotek, Laboratorium, Radiologi, Kasir, Rekam Medis, dan Layanan lainnya) yang mendukung ANTREAN_HARIAN/HIBRIDA. Seluruh poliklinik tetap tampil di penjelajahan Janji Temu, termasuk poli ANTREAN_HARIAN; layanan pendukung dengan mode JANJI_TEMU_DOKTER juga dapat ditelusuri di sana. Label dan aksi mengikuti mode server, sehingga poli harian tidak dipaksa menjadi appointment. Pemetaan kode lama (termasuk DAFTAR) hanya menjadi fallback ketika respons belum memiliki kategori; perubahan kode tidak mengubah kategori tersimpan. Nilai mode tidak dikenal tidak diasumsikan dapat dipesan. Jangan menampilkan kuota tersedia atau estimasi dari keberadaan layanan saja. Klik membuka formulir/detail existing; mutasi tetap membutuhkan konfirmasi. [Implementasi dan QA V6](PATIENT_HOME_V6.md).
 
 ### Warna dan visual operasional
 
@@ -95,6 +95,12 @@ Skala praktis: 4, 8, 12, 16, 20, 24. Token reusable: `smallSpace=8`, `mediumSpac
 Statistik penting dapat lebih besar dari body bila membantu pemindaian cepat. Font 11–12 tidak dipakai untuk instruksi kritis atau pesan error panjang. Override operasional existing seperti metadata PETUGAS 11 dan label 12 boleh dipertahankan jika terbaca dan diuji; jangan mengubah semua angka hanya demi seragam.
 
 `operationalTextTheme` menetapkan headline 20/22, title 14/15/17, body 12/13/14 dan label 11/12/13. Ini mencegah fallback headline Material 24–32 masuk ke card operasional. Ukuran eksplisit pada halaman lama tidak otomatis berubah; koreksi per halaman setelah ada bukti proporsi bermasalah.
+
+### Penyempurnaan ADMIN — 2 November 2026
+
+ADMIN memakai satu skala heading 22/17/15 dan body 13 dengan line height 1,4–1,45; tema di-cache khusus role. Branding/periwinkle bersama dan font Material existing dipertahankan. Panel memakai border ringan tanpa shadow dekoratif; sudut panel 16 dan input/tombol 10. Margin halaman 24 pada desktop, 16 pada layar kecil dan 12 pada lebar di bawah 360.
+
+Judul, keterangan dan aksi halaman disusun melalui AdminPageHeading; aksi turun ke baris berikutnya pada viewport sempit atau teks diperbesar. Kelola Layanan Terpadu berada di header Dashboard. Kartu ringkasan menonjolkan nilai aktual dan jumlah aktif tanpa grafik/estimasi. Daftar layanan memakai pagination bernomor delapan baris dan menyembunyikan footer saat seluruh data sudah muat. Nama layanan dan kode dibedakan secara tipografi; status tetap label + warna/ikon. Navigasi mempertahankan seluruh tujuan langsung, dengan indikator aktif yang lebih tegas; sidebar desktop 232 dan mode ringkas 72. Search/filter memakai panel yang sama secara visual dengan tabel dan tetap Wrap saat sempit. [Implementasi dan batas verifikasi](ADMIN_MODERN_REFRESH_2026_11_02.md).
 
 ### Dokter ADMIN dan agenda praktik
 

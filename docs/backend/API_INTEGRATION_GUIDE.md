@@ -2046,3 +2046,59 @@ Row MENUNGGU memakai **urutan selector existing** (maksimum 100 legacy) dan meta
 Mengganti halaman tindak lanjut tidak mengganti prioritas CALL, FIFO, slot, atau urutan menunggu legacy. Batasi render UI dengan pagination/virtualisasi; search lokal berlaku pada data yang sedang dimuat. Snapshot menunggu legacy tetap dibatasi 100, sehingga bukan pencarian seluruh database. Gunakan batch tindak lanjut berikutnya untuk SKIP/CHECK_IN di luar 100 pertama; bila jumlah batch menyusut sesudah tindakan, klien kembali ke batch sah dan fetch ulang. Jangan menggabungkan batch lama sebagai kebenaran tanpa snapshot baru atau membuat row duplikat.
 
 Dokter terjadwal dibaca melalui **GET /jadwal-praktik?layananId=<uuid>&tanggal=YYYY-MM-DD** existing, lalu dipilih berdasarkan loket dan tanggal. dokterLayanan.dokter kini menyertakan fotoProfil nullable berupa referensi media existing (/media/dokter/<uuid>.webp). Label ini menyatakan jadwal, bukan kehadiran dokter. Pergantian ruang/tanggal membatalkan penerapan hasil request lama pada UI; izin 401/403 mengosongkan cache pasien dan jadwal. Public Display dan Portal Dokter tetap memakai kontraknya masing-masing.
+
+## Kategori layanan, kelengkapan ADMIN, dan pembatalan sesi berakhir — 2 November 2026
+
+### Kategori eksplisit
+
+`GET /layanan` dan proyeksi layanan Prisma menyertakan `kategori`: `POLIKLINIK`, `PENDAFTARAN`, `APOTEK`, `LABORATORIUM`, `RADIOLOGI`, `KASIR`, `REKAM_MEDIS`, atau `LAINNYA`. `POST /layanan` dan `PATCH /layanan/:id` menerima enum ini; null/nilai lain ditolak. Field terpisah dari kode dan `modeReservasi`. PATCH kode tanpa kategori mempertahankan kategori tersimpan. Untuk klien lama yang tidak mengirim kategori pada POST, alias kode dikenali satu kali; default POLIKLINIK.
+
+Migration aditif `20261102_service_category` menambah enum/kolom dan memetakan kode lama termasuk DAFTAR/PENDAFTARAN/REGISTRASI/ADMINISTRASI dan APOTEK/APOTIK. ID, kode dan relasi dipertahankan. Migration harus diterapkan sebelum API terbaru dijalankan; pembuatan file migration dan Prisma generate tidak menerapkannya ke database.
+
+### Kelengkapan konfigurasi ADMIN
+
+`GET /layanan/kesiapan` hanya ADMIN; `Cache-Control: no-store`. Respons array `{layananId, tanggalPenilaian, diperolehPada, lengkap, kekurangan: string[]}`. Tanggal mengikuti SERVICE_TIME_ZONE. Memeriksa layanan aktif, ruang aktif, jam/kapasitas mingguan, dan penugasan PETUGAS aktif di setiap ruang untuk hari penilaian. JANJI_TEMU_DOKTER/HIBRIDA juga membutuhkan dokter terhubung aktif serta setidaknya satu sesi/slot aktif yang belum berakhir dan sesuai ruang, tanggal, jam layanan serta batas sesi. ANTREAN_HARIAN tidak membutuhkan dokter/sesi/slot.
+
+Ini indikator kelengkapan pada waktu pemeriksaan, bukan jaminan loket sedang buka, dokter hadir atau kuota reservasi tersedia. Booking dan CALL tetap memvalidasi kondisi aktual. Flutter menampilkan hasil dan daftar kekurangan di tabel layanan serta Kelola Terpadu. Hasil diperbarui saat katalog/penugasan/jadwal/slot dimuat ulang; kegagalan pemeriksaan menampilkan Belum diperiksa, tanpa mempertahankan hasil lengkap lama.
+
+### Resolusi tiket MENUNGGU setelah sesi berakhir
+
+`POST /queue/:tiketId/batalkan-sesi-berakhir`, JWT PETUGAS, HTTP 200. Body `{loketId: UUID-v4, alasan}`. Alasan wajib salah satu `LAYANAN_TIDAK_DAPAT_DILANJUTKAN`, `DOKTER_BERHALANGAN`, `PASIEN_MEMILIH_BATAL`.
+
+Server memeriksa ulang akun PETUGAS aktif dan penugasan aktif untuk tanggal pelayanan hari ini, layanan/ruang aktif, kepemilikan ruang pada jadwal serta relasi layanan. Hanya tiket janji temu berstatus MENUNGGU, dengan tanggal tiket/sesi hari ini dan waktu akhir sesi sudah terlewati, dapat berubah menjadi DIBATALKAN. Tiket walk-in, ruang lain, tanggal lain, sesi yang masih berlangsung, dan status lain ditolak. Respons berisi tiketId, layananId, loketId, kodeLoket, nomorAntrean, status, versi, urutanMasukAntrean; tidak memuat nama pasien atau alasan.
+
+Transaksi Serializable memakai advisory lock jadwal kemudian slot, pembaruan status+versi bersyarat, pembersihan token QR aktif, dan audit `CANCEL_SESSION_ENDED` berisi aktor, alasan, penugasan, ruang, sesi dan slot. Nomor tiket, urutan dan histori tetap dipertahankan. Konflik serialisasi dicoba ulang maksimal tiga percobaan; konflik status menghasilkan 409 dan akses ruang/penugasan ditolak 403. Alasan invalid menghasilkan 400.
+
+Setelah commit, event `CANCEL` menginvalidasi antrean PETUGAS/Display/Dokter; invalidasi TIKET pasien dan KATALOG mengikuti interceptor. Tidak ada pengumuman TTS untuk CANCEL. Kegagalan pengiriman tidak mengubah hasil transaksi; klien membaca snapshot terbaru. Snapshot privat `daftarPasien.tiket[].bisaBatalkanSesiBerakhir` mengizinkan penawaran menu hanya pada appointment MENUNGGU dengan alasan SESI_BERAKHIR di ruang peminta. Flag hanya petunjuk UI, bukan pengganti otorisasi server. Portal petugas mewajibkan pemilihan alasan/konfirmasi dan menggunakan command gate existing tanpa retry HTTP otomatis.
+
+Kebijakan ini menyediakan pembatalan manual beralasan setelah koordinasi tindak lanjut dengan pasien. Perpanjangan sesi, pemindahan slot, penjadwalan ulang, dan pembatalan otomatis tidak ditambahkan.
+
+## Notifikasi pasien, laporan operasional, dan audit sesi — 2 November 2026
+
+### Inbox pasien
+
+`GET /notifikasi/saya?halaman=1` hanya USER pemilik, no-store. Respons `{total, belumDibaca, halaman, jumlahHalaman, data}`; 20 notifikasi per halaman, urut dibuatPada/id menurun. Data berisi id, tiketAntreanId, jenis, judul, pesan, dibacaPada, dibuatPada. `PATCH /notifikasi/:id/baca` hanya mengubah notifikasi milik JWT; id milik akun lain menghasilkan 404. Pembacaan ulang mempertahankan timestamp baca pertama.
+
+Trigger PostgreSQL sesudah INSERT peristiwa_antrean menulis notifikasi dalam transaksi yang sama, dengan peristiwa_antrean_id unik sebagai kunci deduplikasi. Reservasi harian juga menulis audit RESERVATION_BOOK. Peristiwa reservasi, check-in, masuk antrean, CALL/RECALL, mulai/selesai pelayanan, SKIP dan pembatalan menghasilkan pesan sesuai status tersimpan. Status sama diabaikan kecuali RECALL. Rollback tidak menerbitkan notifikasi; event socket bukan sumber pembuatan pesan. Tidak ada backfill/pesan historis atau estimasi waktu panggilan.
+
+Tombol notifikasi Beranda memakai inbox ini dan feed pasien existing, termasuk invalidasi TIKET, polling fallback dan resume. Ini notifikasi dalam aplikasi, bukan push ketika aplikasi ditutup. Setiap pembacaan memeriksa scope akun; hasil request lama dan dialog dibersihkan saat sesi berubah.
+
+### Laporan ADMIN
+
+`GET /laporan/operasional?mulai=YYYY-MM-DD&selesai=YYYY-MM-DD&layananId=<opsional UUID>` hanya ADMIN, no-store. Periode inklusif maksimal 31 hari; pengelompokan memakai tanggal_antrean (kalender SERVICE_TIME_ZONE), bukan tanggal pembuatan tiket. Respons `{periode, diperolehPada, ringkasan, baris}`. Setiap baris mewakili tanggal/layanan dengan totalTiket, pasienUnik dan delapan jumlah status terkini: dipesan, checkIn, menunggu, dipanggil, dilayani, selesai, dibatalkan, dilewati.
+
+Durasi tunggu = pelayanan_dimulai_pada - check_in_pada; durasi pelayanan = pelayanan_selesai_pada - pelayanan_dimulai_pada. Hanya pasangan timestamp lengkap dan nonnegatif dihitung; API mengembalikan rataTungguDetik/rataPelayananDetik nullable beserta sampelTunggu/sampelPelayanan. Tidak ada sampel berarti null, bukan nol menit. Pasien unik ringkasan dihitung COUNT DISTINCT untuk seluruh filter dan tidak dijumlahkan dari baris. DILEWATI adalah status tiket saat ini, bukan jumlah semua tindakan SKIP historis. Data yang sudah dihapus tidak direkonstruksi.
+
+Maksimal 5.000 baris detail; hasil lebih besar ditolak 400 dan perlu filter lebih sempit, tanpa pemotongan diam-diam. Halaman `/admin/reports` menyediakan filter, pagination tampilan, PDF maksimal 500 baris dan CSV seluruh hasil. Ekspor memakai snapshot filter yang telah dimuat; mengubah filter/sesi membatalkan penggunaan snapshot lama. CSV menetralkan awalan formula spreadsheet. CSV tersedia pada Web/desktop melalui file selector; PDF memakai mekanisme printing/share existing. Pembatalan dialog simpan bukan keberhasilan simpan.
+
+### Audit akun dan sesi
+
+`GET /audit-sesi?mulai=YYYY-MM-DD&selesai=YYYY-MM-DD&halaman=1` hanya ADMIN, no-store. Filter opsional aksi (LOGIN, REFRESH, LOGOUT, CABUT_SESI, BACA_AUDIT), hasil (BERHASIL, DITOLAK, ERROR), akunRef dan sesiRef (UUID). Periode kalender UTC inklusif maksimal 31 hari; bacaan dibatasi retensi 30 hari. Respons `{total, halaman, jumlahHalaman, zonaWaktu:'UTC', retensiHari:30, data}`, 30 baris per halaman. Pembacaan audit berhasil juga dicatat.
+
+Setiap event menyimpan requestId acak dari server, referensi akun/sesi/aktor acak terpisah dari ID autentikasi, aksi, hasil, alasan allowlist, jumlahSesi opsional, klien allowlist, sumber UNKNOWN dan timestamp UTC. Tidak menyimpan password, token/hash token, Authorization/cookie, body request, nama/email, data pasien, IP atau User-Agent. Header x-queueb-client hanya klaim WEB/ANDROID/IOS/DESKTOP; nilai lain UNKNOWN. Klaim tersebut tidak memberikan otorisasi atau membuktikan asal proses. Percobaan login ditolak dapat dikorelasikan ke akun sasaran, tetapi tidak mengatribusikan percobaan itu kepada aktor terautentikasi.
+
+LOGIN/REFRESH/LOGOUT dicatat setelah operasi berhasil atau sebagai DITOLAK/ERROR tanpa serialisasi exception. Pencabutan sesi akibat ubah password sendiri dan penonaktifan PETUGAS dicatat setelah commit beserta jumlah sesi terdampak. CAS/rotasi token, expiry, RBAC dan kontrak respons auth dipertahankan. Sink audit menggunakan transaksi terpisah (maxWait 500 ms, timeout 1.000 ms), fail-open dengan warning generik; audit tidak dijamin tercatat bila sink gagal dan bukan bukti lengkap untuk interval gangguan. Pembersihan event lebih tua dari 30 hari dilakukan paling sering sekali per jam saat aktivitas audit berikutnya; ketika aplikasi tidak digunakan, pembersihan fisik menunggu aktivitas berikutnya. Referensi korelasi pada akun/sesi bertahan mengikuti masa hidup row induknya dan tidak dipakai sebagai kredensial.
+
+Halaman `/admin/session-activity` menyediakan filter, pagination, dan detail korelasi yang dapat disalin. Telemetry prospektif ini tidak mengubah atribusi historis UNATTRIBUTED pada AUTH-SESSION-01.
+
+Migration `20261102_notifications_and_session_audit` wajib diterapkan setelah migration kategori, sebelum API terbaru dijalankan. Prisma generate/validate tidak menerapkan migration. Status penerapan dan batas verifikasi: [QA poin 4–6](../qa/IMPROVEMENTS_4_6_2026_11_02.md).

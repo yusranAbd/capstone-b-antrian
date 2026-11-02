@@ -7,7 +7,6 @@ import 'package:queueb_client/src/app.dart';
 import 'package:queueb_client/src/config.dart';
 import 'package:queueb_client/src/patient_home.dart';
 import 'package:queueb_client/src/patient_home_v8.dart';
-import 'package:queueb_client/src/patient_mobile_v5.dart';
 import 'package:queueb_client/src/patient_reservations.dart';
 import 'package:queueb_client/src/user_profile.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -65,7 +64,12 @@ void main() {
   }
 
   Future<void> nav(WidgetTester t, String label) async {
-    await t.tap(find.widgetWithText(NavigationDestination, label));
+    await t.tap(
+      find.widgetWithText(
+        NavigationDestination,
+        label == 'Riwayat' ? 'Reservasi' : label,
+      ),
+    );
     await t.pumpAndSettle();
   }
 
@@ -115,25 +119,22 @@ void main() {
           expect(scaffold.floatingActionButton, isNotNull);
           await t.tap(fab);
           await t.pumpAndSettle();
-          for (final label in [
-            'Cari Dokter',
-            'Pilih Poliklinik',
-            'Jadwal Terdekat',
-          ]) {
+          for (final label in ['Cari Dokter', 'Jadwal Terdekat']) {
             expect(find.text(label), findsOneWidget);
           }
           await t.tap(find.byTooltip('Tutup pilihan reservasi'));
           await t.pumpAndSettle();
           await openPatientTickets(t);
-          expect(find.byType(PatientTicketCard), findsOneWidget);
-          await t.ensureVisible(find.text('Lihat Tiket / QR'));
+          expect(find.byType(ReservationCard), findsOneWidget);
+          await t.ensureVisible(find.text('Buka Tiket'));
           await t.pumpAndSettle();
-          await t.tap(find.text('Lihat Tiket / QR'));
+          await t.tap(find.text('Buka Tiket'));
           await t.pumpAndSettle();
-          expect(find.text('Tiket UM-001'), findsOneWidget);
-          await t.ensureVisible(find.text('Terbitkan QR'));
-          await t.tap(find.text('Terbitkan QR'));
-          await t.pumpAndSettle();
+          expect(find.text('Detail Tiket'), findsOneWidget);
+          expect(
+            b.requests.where((r) => r.$1 == 'POST' && r.$2.endsWith('/qr')),
+            hasLength(1),
+          );
           expect(find.byType(QrImageView), findsOneWidget);
           await t.tap(find.text('Tutup'));
           await t.pumpAndSettle();
@@ -169,7 +170,7 @@ void main() {
       await launch(t, b, const Size(320, 568));
       expect(find.text('Belum ada kunjungan mendatang.'), findsOneWidget);
       await openPatientTickets(t);
-      expect(find.byType(PatientTicketCard).evaluate().length, lessThan(31));
+      expect(find.byType(ReservationCard).evaluate().length, lessThan(31));
       // Search the reservation projection so the cancelled ticket is selected explicitly.
       await nav(t, 'Riwayat');
       await t.enterText(find.byType(TextField), 'UM-001');

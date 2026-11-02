@@ -24,6 +24,7 @@ class PracticeScheduleEditor extends StatefulWidget {
     this.row,
     this.onSave,
     this.catalogSource,
+    this.initialClinicId,
   });
 
   final QueueApi api;
@@ -31,6 +32,7 @@ class PracticeScheduleEditor extends StatefulWidget {
   final Json? row;
   final Future<Json> Function(Json)? onSave;
   final AdminCatalogRepository? catalogSource;
+  final String? initialClinicId;
 
   @override
   State<PracticeScheduleEditor> createState() => _PracticeScheduleEditorState();
@@ -103,6 +105,11 @@ class _PracticeScheduleEditorState extends State<PracticeScheduleEditor> {
     for (final doctor in catalog['/dokter'] ?? <Json>[]) {
       for (final link in rows(doctor['dokterLayanan'])) {
         final clinic = object(link['layanan']);
+        final serviceId = '${link['layananId'] ?? clinic['id']}';
+        if (widget.initialClinicId != null &&
+            serviceId != widget.initialClinicId) {
+          continue;
+        }
         if (link['id'] is! String) continue;
         final available =
             doctor['aktif'] != false &&

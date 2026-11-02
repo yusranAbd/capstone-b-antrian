@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 
 import 'config.dart';
+import 'service_category.dart';
 import 'patient_design.dart';
 import 'patient_home.dart';
 import 'patient_home_v7.dart';
@@ -18,15 +19,9 @@ abstract final class PatientHomeV6Style {
   static const soft = PatientDesign.soft;
 }
 
-// The existing API has no service-category field. These explicit service codes
-// identify auxiliary desks, independently of the booking mode. No catalog rows
-// are invented here; administrators still own the actual records in the API.
-bool isAuxiliaryHomeService(Json clinic) => const {
-  ...patientDailyServiceOrder,
-  'REGISTRASI',
-  'ADMINISTRASI',
-  'APOTIK',
-}.contains('${clinic['kode'] ?? ''}'.trim().toUpperCase());
+bool isAuxiliaryHomeService(Json clinic) =>
+    serviceCategoryLabels.containsKey(serviceCategory(clinic)) &&
+    serviceCategory(clinic) != 'POLIKLINIK';
 
 bool supportsHomeWalkIn(Json clinic) =>
     clinic['aktif'] != false &&
@@ -35,7 +30,8 @@ bool supportsHomeWalkIn(Json clinic) =>
 
 bool supportsHomeAppointment(Json clinic) =>
     clinic['aktif'] != false &&
-    !isAuxiliaryHomeService(clinic) &&
+    (!isAuxiliaryHomeService(clinic) ||
+        clinic['modeReservasi'] == 'JANJI_TEMU_DOKTER') &&
     [
       'ANTREAN_HARIAN',
       'JANJI_TEMU_DOKTER',
@@ -396,12 +392,14 @@ class PatientHomeService extends StatelessWidget {
     this.ticket,
     this.queue,
     this.hours = 'Jam belum tersedia',
+    this.staffName,
     this.onTap,
   });
   final Json clinic;
   final Json? ticket;
   final PatientQueueView? queue;
   final String hours;
+  final String? staffName;
   final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) => PatientServiceTicketV8(
@@ -409,6 +407,7 @@ class PatientHomeService extends StatelessWidget {
     ticket: ticket,
     queue: queue,
     hours: hours,
+    staffName: staffName,
     onTap: onTap,
   );
 }

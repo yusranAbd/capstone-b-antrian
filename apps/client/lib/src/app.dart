@@ -13,6 +13,7 @@ import 'login_ui.dart';
 import 'patient_design.dart';
 import 'staff_v4.dart';
 import 'queueb_palette.dart';
+import 'queueb_feedback.dart';
 
 class QueueBApp extends StatefulWidget {
   const QueueBApp({super.key, required this.api});
@@ -41,6 +42,15 @@ class _QueueBAppState extends State<QueueBApp> {
   @override
   Widget build(BuildContext context) => MaterialApp.router(
     routerConfig: routing.router,
+    builder: (context, child) => QueueBFeedbackHost(
+      navigatorKey: routing.rootKey,
+      session: routing.refresh,
+      sessionKey: () => routing.refresh.scopeKey,
+      navigation: routing.router.routeInformationProvider,
+      locationKey: () =>
+          routing.router.routeInformationProvider.value.uri.toString(),
+      child: child ?? const SizedBox.shrink(),
+    ),
     title: 'QueueB Hospital',
     debugShowCheckedModeBanner: false,
     locale: const Locale('id'),
@@ -78,6 +88,13 @@ PreferredSizeWidget portalHeader(
       onProfile: openProfile,
     );
   }
+  if (role == 'DOKTER') {
+    return DoctorToolbar(
+      avatar: AccountAvatar(api: api, radius: 18),
+      name: (api.user?['nama'] ?? 'Dokter').toString(),
+      onProfile: openProfile,
+    );
+  }
   return AppBar(
     automaticallyImplyLeading: role != 'USER',
     toolbarHeight: role == 'USER'
@@ -107,13 +124,12 @@ PreferredSizeWidget portalHeader(
           icon: const Icon(Icons.notifications_none_rounded),
         ),
 
-      if (['DOKTER', 'PETUGAS'].contains(role) &&
-          MediaQuery.sizeOf(context).width >= 700)
-        ProfileHeaderIdentity(api: api),
       if (role != 'USER' && role != 'ADMIN')
         IconButton(
           tooltip: 'Profil akun',
-          icon: ExcludeSemantics(child: AccountAvatar(api: api, radius: 16)),
+          icon: role == 'DOKTER'
+              ? const Icon(Icons.person_outline_rounded)
+              : ExcludeSemantics(child: AccountAvatar(api: api, radius: 16)),
           onPressed: openProfile,
         ),
       if (role != 'USER')
@@ -312,242 +328,221 @@ class _LoginPageState extends State<LoginPage> {
       builder: (context) => Scaffold(
         backgroundColor: LoginStyle.paper,
         body: SafeArea(
-          child: LoginLayout(
-            child: LoginFormCard(
-              child: AutofillGroup(
-                child: Form(
-                  key: form,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Center(child: QueueBBrand(compact: true)),
-                      const SizedBox(height: 20),
-                      Text(
-                        register ? 'Daftar' : 'Masuk',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 25,
-                          fontWeight: FontWeight.w800,
-                          color: PatientDesign.ink,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        register
-                            ? 'Daftar akun pasien'
-                            : 'Akses sistem antrean rumah sakit',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: PatientDesign.muted,
-                          fontSize: 13,
-                          height: 1.5,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      if (widget.notice != null)
-                        Semantics(
-                          container: true,
-                          liveRegion: true,
-                          label: widget.notice!,
-                          excludeSemantics: true,
-                          child: MobileNotice(widget.notice!),
-                        ),
-                      if (error != null)
-                        Semantics(
-                          container: true,
-                          liveRegion: true,
-                          label: error!,
-                          excludeSemantics: true,
-                          child: MobileNotice(error!, error: true),
-                        ),
-                      if (message != null)
-                        Semantics(
-                          container: true,
-                          liveRegion: true,
-                          label: message!,
-                          excludeSemantics: true,
-                          child: MobileNotice(message!),
-                        ),
-                      if (register) ...[
-                        TextFormField(
-                          key: const ValueKey('login-name'),
-                          controller: name,
-                          style: LoginStyle.inputText,
-                          enabled: !busy,
-                          textInputAction: TextInputAction.next,
-                          autofillHints: const [AutofillHints.name],
-                          decoration: const InputDecoration(
-                            labelText: 'Nama lengkap',
-                            prefixIcon: Icon(Icons.person_outline),
-                            alignLabelWithHint: true,
-                          ),
-                          validator: (v) =>
-                              v == null || v.trim().length < 3 || v.length > 150
-                              ? 'Nama 3–150 karakter.'
-                              : null,
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-                      TextFormField(
-                        key: const ValueKey('login-email'),
-                        controller: email,
-                        style: LoginStyle.inputText,
-                        enabled: !busy,
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.next,
-                        autofillHints: const [AutofillHints.username],
-                        decoration: const InputDecoration(
-                          labelText: 'Email',
-                          hintText: 'nama@email.com',
-                          prefixIcon: Icon(Icons.mail_outline),
-                        ),
-                        validator: (v) =>
-                            v == null ||
-                                !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
-                                    .hasMatch(v.trim())
-                            ? 'Masukkan email yang valid.'
-                            : null,
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        key: const ValueKey('login-password'),
-                        controller: password,
-                        style: LoginStyle.inputText,
-                        enabled: !busy,
-                        obscureText: obscure,
-                        textInputAction: TextInputAction.done,
-                        autofillHints: [
-                          register
-                              ? AutofillHints.newPassword
-                              : AutofillHints.password,
-                        ],
-                        decoration: InputDecoration(
-                          labelText: 'Kata sandi',
-                          hintText: 'Masukkan kata sandi',
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          suffixIcon: IconButton(
-                            tooltip: obscure
-                                ? 'Tampilkan kata sandi'
-                                : 'Sembunyikan kata sandi',
-                            onPressed: busy
-                                ? null
-                                : () => setState(() => obscure = !obscure),
-                            icon: Icon(
-                              obscure
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
-                            ),
-                          ),
-                        ),
-                        onFieldSubmitted: (_) => submit(),
-                        validator: (v) => v == null || v.isEmpty
-                            ? 'Kata sandi wajib diisi.'
-                            : register && (v.length < 8 || v.length > 72)
-                            ? 'Kata sandi 8–72 karakter.'
-                            : null,
-                      ),
-                      const SizedBox(height: 20),
-                      FilledButton(
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size(48, 48),
-                        ),
-                        onPressed: busy ? null : submit,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            if (busy) ...[
-                              const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                            ],
-                            Flexible(
-                              child: Text(
-                                busy
-                                    ? 'Memproses…'
-                                    : register
-                                    ? 'Daftar pasien'
-                                    : 'Masuk',
-                              ),
-                            ),
-                            if (!busy) ...[
-                              const SizedBox(width: 16),
-                              const Icon(Icons.arrow_forward_rounded, size: 21),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: Row(
-                          children: [
-                            Expanded(child: Divider(color: LoginStyle.rule)),
-                            Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 14),
-                              child: Text(
-                                'atau',
-                                style: TextStyle(
-                                  color: PatientDesign.muted,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                            Expanded(child: Divider(color: LoginStyle.rule)),
-                          ],
-                        ),
-                      ),
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: PatientDesign.primary,
-                          side: const BorderSide(color: PatientDesign.primary),
-                          minimumSize: const Size(48, 48),
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                              LoginStyle.fieldRadius,
-                            ),
-                          ),
-                          textStyle: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                          ),
-                        ),
-                        onPressed: busy ? null : widget.onDisplay,
-                        icon: const Icon(
-                          Icons.desktop_windows_outlined,
-                          size: 20,
-                        ),
-                        label: const Text('Masuk ke Public Display'),
-                      ),
-                      const SizedBox(height: 12),
-                      TextButton(
-                        onPressed: busy
-                            ? null
-                            : () => setState(() {
-                                changeRegistration(!register);
-                                error = null;
-                                message = null;
-                              }),
-                        child: Text(
-                          register
-                              ? 'Sudah punya akun? Masuk'
-                              : 'Pasien baru? Daftar',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
+          child: LoginLayout(child: Builder(builder: _loginCard)),
         ),
       ),
     ),
   );
+
+  Widget _loginCard(BuildContext context) {
+    final compact = LoginStyle.compact(context);
+    Widget notice(String text, {bool isError = false, bool success = false}) =>
+        MobileNotice(text, error: isError, success: success, popup: true);
+    return LoginFormCard(
+      child: AutofillGroup(
+        child: Form(
+          key: form,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Center(child: QueueBBrand(compact: true)),
+              SizedBox(height: compact ? 16 : 24),
+              Text(
+                register ? 'Daftar' : 'Masuk',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: compact ? 25 : 30,
+                  height: 1.15,
+                  fontWeight: FontWeight.w800,
+                  color: PatientDesign.ink,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                register
+                    ? 'Daftar akun pasien'
+                    : 'Akses sistem antrean rumah sakit',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: PatientDesign.muted,
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+              ),
+              SizedBox(height: compact ? 20 : 26),
+              if (widget.notice != null) notice(widget.notice!),
+              if (error != null) notice(error!, isError: true),
+              if (message != null) notice(message!, success: true),
+              if (register) ...[
+                TextFormField(
+                  key: const ValueKey('login-name'),
+                  controller: name,
+                  enabled: !busy,
+                  style: LoginStyle.inputText,
+                  textCapitalization: TextCapitalization.words,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.name],
+                  decoration: const InputDecoration(
+                    labelText: 'Nama lengkap',
+                    prefixIcon: Icon(Icons.person_outline),
+                  ),
+                  validator: (v) =>
+                      v == null || v.trim().length < 3 || v.length > 150
+                      ? 'Nama 3–150 karakter.'
+                      : null,
+                ),
+                const SizedBox(height: 14),
+              ],
+              TextFormField(
+                key: const ValueKey('login-email'),
+                controller: email,
+                enabled: !busy,
+                style: LoginStyle.inputText,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.username],
+                autocorrect: false,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  hintText: 'nama@email.com',
+                  prefixIcon: Icon(Icons.mail_outline),
+                ),
+                validator: (v) =>
+                    v == null ||
+                        !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+                            .hasMatch(v.trim())
+                    ? 'Masukkan email yang valid.'
+                    : null,
+              ),
+              const SizedBox(height: 14),
+              TextFormField(
+                key: const ValueKey('login-password'),
+                controller: password,
+                enabled: !busy,
+                style: LoginStyle.inputText,
+                obscureText: obscure,
+                autocorrect: false,
+                enableSuggestions: false,
+                textInputAction: TextInputAction.done,
+                autofillHints: [
+                  register ? AutofillHints.newPassword : AutofillHints.password,
+                ],
+                decoration: InputDecoration(
+                  labelText: 'Kata sandi',
+                  hintText: 'Masukkan kata sandi',
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  suffixIcon: IconButton(
+                    tooltip: obscure
+                        ? 'Tampilkan kata sandi'
+                        : 'Sembunyikan kata sandi',
+                    onPressed: busy
+                        ? null
+                        : () => setState(() => obscure = !obscure),
+                    icon: Icon(
+                      obscure
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
+                  ),
+                ),
+                onFieldSubmitted: (_) => submit(),
+                validator: (v) => v == null || v.isEmpty
+                    ? 'Kata sandi wajib diisi.'
+                    : register && (v.length < 8 || v.length > 72)
+                    ? 'Kata sandi 8–72 karakter.'
+                    : null,
+              ),
+              SizedBox(height: compact ? 18 : 22),
+              FilledButton(
+                onPressed: busy ? null : submit,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (busy) ...[
+                      const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                    ],
+                    Flexible(
+                      child: Text(
+                        busy
+                            ? 'Memproses…'
+                            : register
+                            ? 'Daftar pasien'
+                            : 'Masuk',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: compact ? 12 : 18),
+                child: const Row(
+                  children: [
+                    Expanded(child: Divider(color: LoginStyle.rule)),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 14),
+                      child: Text(
+                        'atau',
+                        style: TextStyle(
+                          color: PatientDesign.muted,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    Expanded(child: Divider(color: LoginStyle.rule)),
+                  ],
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: busy ? null : widget.onDisplay,
+                icon: const Icon(Icons.desktop_windows_outlined, size: 20),
+                label: const Text(
+                  'Masuk ke Public Display',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: busy
+                    ? null
+                    : () => setState(() {
+                        changeRegistration(!register);
+                        error = null;
+                        message = null;
+                      }),
+                child: Text.rich(
+                  TextSpan(
+                    style: const TextStyle(color: PatientDesign.muted),
+                    children: [
+                      TextSpan(
+                        text: register
+                            ? 'Sudah punya akun?  '
+                            : 'Pasien baru?  ',
+                      ),
+                      TextSpan(
+                        text: register ? 'Masuk' : 'Daftar',
+                        style: const TextStyle(
+                          color: PatientDesign.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

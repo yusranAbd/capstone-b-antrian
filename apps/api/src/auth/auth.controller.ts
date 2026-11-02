@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Post,
@@ -19,6 +20,7 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { ProfileService } from './profile/profile.service';
+import { authAuditContext } from './audit/auth-audit.service';
 
 @Controller('auth')
 export class AuthController {
@@ -58,8 +60,8 @@ export class AuthController {
       ttl: 60_000,
     },
   })
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  login(@Body() dto: LoginDto, @Headers('x-queueb-client') client?: string) {
+    return this.authService.login(dto, authAuditContext(client));
   }
 
   // =====================================
@@ -87,8 +89,11 @@ export class AuthController {
       ttl: 60_000,
     },
   })
-  refresh(@Body() dto: RefreshTokenDto) {
-    return this.authService.refresh(dto);
+  refresh(
+    @Body() dto: RefreshTokenDto,
+    @Headers('x-queueb-client') client?: string,
+  ) {
+    return this.authService.refresh(dto, authAuditContext(client));
   }
 
   // =====================================
@@ -105,7 +110,10 @@ export class AuthController {
       ttl: 60_000,
     },
   })
-  logout(@Body() dto: RefreshTokenDto) {
-    return this.authService.logout(dto);
+  logout(
+    @Body() dto: RefreshTokenDto,
+    @Headers('x-queueb-client') client?: string,
+  ) {
+    return this.authService.logout(dto, authAuditContext(client));
   }
 }

@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:queueb_client/src/mobile_ui.dart';
 
 import 'patient_test_navigation.dart';
 
@@ -259,7 +258,10 @@ void main() {
       tester,
     ) async {
       final (_, backend, router) = await launch(tester, 'USER', cold: path);
-      expect(router.routeInformationProvider.value.uri.toString(), path);
+      expect(
+        router.routeInformationProvider.value.uri.toString(),
+        path == '/patient/reservations/new' ? '/patient/reservations' : path,
+      );
       expect(backend.requests.where((r) => r.$1 != 'GET'), isEmpty);
       if (path.contains('/tickets/')) {
         expect(
@@ -442,7 +444,7 @@ void main() {
       expect(router.routeInformationProvider.value.uri.path, '/patient');
       router.go('/patient/reservations/new');
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(NavigationDestination, 'Riwayat'));
+      await tester.tap(find.widgetWithText(NavigationDestination, 'Reservasi'));
       await tester.pumpAndSettle();
       expect(
         router.routeInformationProvider.value.uri.path,
@@ -475,7 +477,7 @@ void main() {
     );
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     final (_, _, router) = await launch(tester, 'USER');
-    final destinations = ['Beranda', 'Riwayat', 'Informasi', 'Profil'];
+    final destinations = ['Beranda', 'Reservasi', 'Informasi', 'Profil'];
     final paths = [
       '/patient',
       '/patient/reservations',
@@ -559,7 +561,6 @@ void main() {
         postGate: gate,
       );
       await openPatientCatalog(tester, walkIn: true);
-      await tester.tap(find.byType(ClinicCard).first);
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Reservasi walk-in'));
       await tester.tap(find.text('Reservasi walk-in'));

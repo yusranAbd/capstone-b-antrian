@@ -78,7 +78,8 @@ class _PatientAgendaState extends State<PatientAgenda> {
               ),
               if (widget.error != null)
                 MobileNotice(widget.error!, error: true),
-              if (widget.message != null) MobileNotice(widget.message!),
+              if (widget.message != null)
+                MobileNotice(widget.message!, success: true),
               if (widget.loading) const LinearProgressIndicator(),
               if (days.isNotEmpty)
                 SingleChildScrollView(

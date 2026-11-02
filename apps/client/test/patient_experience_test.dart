@@ -116,7 +116,7 @@ void main() {
       await t.pumpWidget(const SizedBox());
       api.dispose();
     });
-    await t.tap(find.widgetWithText(NavigationDestination, 'Riwayat'));
+    await t.tap(find.widgetWithText(NavigationDestination, 'Reservasi'));
     await t.pumpAndSettle();
     await t.tap(find.byType(FloatingActionButton));
     await t.pumpAndSettle();
@@ -129,7 +129,7 @@ void main() {
     await t.tap(find.byTooltip('Tutup pilihan reservasi'));
     await t.pumpAndSettle();
     await openPatientTickets(t);
-    await t.tap(find.text('Lihat Tiket / QR'));
+    await t.tap(find.text('Buka Tiket'));
     await t.pumpAndSettle();
     expect(
       Theme.of(t.element(find.byType(AlertDialog))).colorScheme.primary,
@@ -163,7 +163,7 @@ void main() {
       );
       await t.enterText(search, 'tidak-ada-dokter');
       await t.pumpAndSettle();
-      await t.tap(find.widgetWithText(NavigationDestination, 'Riwayat'));
+      await t.tap(find.widgetWithText(NavigationDestination, 'Reservasi'));
       await t.pumpAndSettle();
       await t.tap(find.widgetWithText(NavigationDestination, 'Beranda'));
       await t.pumpAndSettle();

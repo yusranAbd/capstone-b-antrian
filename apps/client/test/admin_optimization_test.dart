@@ -73,7 +73,7 @@ void main() {
       );
       expect(find.text('Master data'), findsNothing);
       expect(find.byType(ExpansionTile), findsNothing);
-      expect(find.byType(ListTile), findsNWidgets(9));
+      expect(find.byType(ListTile), findsNWidgets(11));
       expect(find.text('Dokter'), findsOneWidget);
       expect(find.text('Slot konsultasi'), findsOneWidget);
       await tester.tap(find.text('Slot konsultasi'));
@@ -129,11 +129,8 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(
-        tester
-            .widget<PaginatedDataTable>(find.byType(PaginatedDataTable))
-            .source
-            .rowCount,
-        1,
+        tester.widget<DataTable>(find.byType(DataTable)).rows,
+        hasLength(1),
       );
       await tester.tap(find.byTooltip('Aksi profil dokter'));
       await tester.pumpAndSettle();
@@ -264,13 +261,17 @@ void main() {
   testWidgets(
     'slots are fetched only on session expansion and inactive filter works',
     (tester) async {
-      int requests = 0;
+      int requests = 0, readinessRequests = 0;
       final api = QueueApi(
         config: AppConfig(
           apiBaseUrl: 'http://localhost/api/v1',
           realtime: false,
         ),
         client: MockClient((r) async {
+          if (r.url.path.endsWith('/layanan/kesiapan')) {
+            readinessRequests++;
+            return http.Response('[]', 200);
+          }
           requests++;
           expect(r.url.queryParameters['jadwalPraktikId'], 'session-0');
           return http.Response(
@@ -309,9 +310,11 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(requests, 0);
+      expect(readinessRequests, 0);
       await tester.tap(find.byType(ExpansionTile));
       await tester.pumpAndSettle();
       expect(requests, 1);
+      expect(readinessRequests, 1);
       expect(find.text('Nonaktif'), findsOneWidget);
       await tester.ensureVisible(find.byType(AdminRowActions));
       await tester.tap(find.byType(AdminRowActions));

@@ -23,6 +23,7 @@ export interface SnapshotPasien {
   loketId: string | null;
   bisaAntreUlang?: boolean;
   bisaMasukAntrean?: boolean;
+  bisaBatalkanSesiBerakhir?: boolean;
 }
 
 export interface SnapshotTiketAktif {
@@ -37,7 +38,13 @@ export interface SnapshotTiketAktif {
 }
 
 export interface SnapshotAntrean {
-  daftarPasien?: { total: number; ditampilkan: number; tiket: SnapshotPasien[]; halamanTindakLanjut: number; jumlahHalamanTindakLanjut: number };
+  daftarPasien?: {
+    total: number;
+    ditampilkan: number;
+    tiket: SnapshotPasien[];
+    halamanTindakLanjut: number;
+    jumlahHalamanTindakLanjut: number;
+  };
   versiSkema: 1;
   diperolehPada: string;
   tanggalPelayanan: string;

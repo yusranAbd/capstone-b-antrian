@@ -8,7 +8,8 @@ export type JenisPerubahanAntrean =
   | 'SKIP'
   | 'REQUEUE'
   | 'START'
-  | 'COMPLETE';
+  | 'COMPLETE'
+  | 'CANCEL';
 
 export interface QueueUpdatedInput {
   aksi: JenisPerubahanAntrean;

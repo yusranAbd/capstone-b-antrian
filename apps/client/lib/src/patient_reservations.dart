@@ -353,7 +353,11 @@ class _ReservationListState extends State<ReservationList> {
     if ((widget.error != null && widget.error != oldWidget.error) ||
         (widget.message != null && widget.message != oldWidget.message)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && scroll.hasClients) {
+        if (mounted &&
+            scroll.hasClients &&
+            scroll.positions.every(
+              (position) => position.hasPixels && position.hasContentDimensions,
+            )) {
           scroll.animateTo(
             0,
             duration: const Duration(milliseconds: 180),
@@ -442,7 +446,8 @@ class _ReservationListState extends State<ReservationList> {
                   child: const Text('Coba lagi'),
                 ),
               ],
-              if (widget.message != null) MobileNotice(widget.message!),
+              if (widget.message != null)
+                MobileNotice(widget.message!, success: true),
               if (widget.loading) const LinearProgressIndicator(),
               const SizedBox(height: 12),
               TextField(
@@ -536,12 +541,6 @@ Future<String?> chooseReservationMethod(BuildContext context) =>
                 icon: Icons.person_outline,
                 title: 'Cari Dokter',
                 detail: 'Pilih dokter dan jadwal praktik.',
-              ),
-              (
-                id: 'clinics',
-                icon: Icons.local_hospital_outlined,
-                title: 'Pilih Poliklinik',
-                detail: 'Lihat layanan berdasarkan poliklinik.',
               ),
               (
                 id: 'nearest',

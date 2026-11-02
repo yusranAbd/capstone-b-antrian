@@ -7,6 +7,7 @@ import '../models/admin_staff_models.dart';
 import '../models/admin_display_models.dart';
 
 const adminMasterPaths = {'/layanan', '/dokter', '/loket'};
+const adminReadinessPath = '/layanan/kesiapan';
 
 /// Owned by the ADMIN portal. Legacy modules only read/publish through this
 /// catalog; no second parent cache and no socket or authentication manager.
@@ -50,6 +51,17 @@ class AdminCatalogRepository extends ChangeNotifier {
   Future<void> refresh(Iterable<String> paths) {
     _check();
     _dirty.addAll(paths);
+    if (_dirty.any(
+      (path) => const {
+        ...adminMasterPaths,
+        '/jadwal-layanan',
+        '/jadwal-praktik',
+        '/penugasan-petugas',
+        '/akun-petugas',
+      }.contains(path),
+    )) {
+      _dirty.add(adminReadinessPath);
+    }
     return _pending ??= _drain().whenComplete(() {
       _pending = null;
       if (_dirty.isNotEmpty && active) return refresh(const []);
@@ -66,6 +78,8 @@ class AdminCatalogRepository extends ChangeNotifier {
           try {
             result = await api.request('GET', path);
           } catch (error) {
+            // Missing/unavailable hints must never retain a previous "complete" result.
+            if (path == adminReadinessPath) return <Json>[];
             // Reconciliation from another module may also read devices.
             if (path == adminDisplayPath) throw safeDisplayError(error);
             rethrow;

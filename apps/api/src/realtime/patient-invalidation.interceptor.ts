@@ -67,7 +67,7 @@ export class PatientInvalidationInterceptor implements NestInterceptor {
             ['queue', 'check-in'].includes(controller) &&
             request.user?.peran === PeranPengguna.PETUGAS
           ) {
-            const data = result as { tiketId?: string } | null;
+            const data = result as { tiketId?: string; status?: string } | null;
             if (typeof data?.tiketId === 'string') {
               const ticket = await this.prisma.tiketAntrean.findUnique({
                 where: { id: data.tiketId },
@@ -84,6 +84,9 @@ export class PatientInvalidationInterceptor implements NestInterceptor {
                     ticket.layananId,
                     ticket.tanggalAntrean.toISOString().slice(0, 10),
                   ),
+                  ...(data?.status === 'DIBATALKAN'
+                    ? [this.gateway.invalidate('KATALOG')]
+                    : []),
                 ]);
                 if (notifications.some((n) => n.status === 'rejected')) {
                   this.logger.warn(

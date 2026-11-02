@@ -1,4 +1,7 @@
 import 'dart:convert';
+import 'dart:async';
+
+import 'package:flutter/services.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pdf/pdf.dart';
@@ -44,26 +47,90 @@ void main() {
       reservationCode: 'TK0123456789ABCDEF01234567',
     );
     expect(ticket.receiptQrPayload, 'QBR1.TK0123456789ABCDEF01234567');
-    expect(PatientTicketPdf.receiptFormat(ticket).height,
-        greaterThan(PatientTicketPdf.receiptFormat(sample).height - 10));
+    expect(
+      PatientTicketPdf.receiptFormat(ticket).height,
+      greaterThan(PatientTicketPdf.receiptFormat(sample).height - 10),
+    );
     final bytes = await PatientTicketPdf.build(ticket);
     expect(ascii.decode(bytes.take(5).toList()), '%PDF-');
   });
 
-  test('QR reservasi tidak muncul untuk tiket selesai, kode palsu, atau kosong', () {
-    const selesai = PatientTicketPdfData(
-      queueNumber: 'PD-001', serviceName: 'Poliklinik', status: 'Selesai',
-      serviceDate: '3 November 2026', patientName: 'Pasien',
-      reservationCode: 'TK0123456789ABCDEF01234567',
+  test(
+    'QR reservasi tidak muncul untuk tiket selesai, kode palsu, atau kosong',
+    () {
+      const selesai = PatientTicketPdfData(
+        queueNumber: 'PD-001',
+        serviceName: 'Poliklinik',
+        status: 'Selesai',
+        serviceDate: '3 November 2026',
+        patientName: 'Pasien',
+        reservationCode: 'TK0123456789ABCDEF01234567',
+      );
+      const palsu = PatientTicketPdfData(
+        queueNumber: 'PD-001',
+        serviceName: 'Poliklinik',
+        status: 'Dipesan',
+        serviceDate: '3 November 2026',
+        patientName: 'Pasien',
+        reservationCode: 'bukan-token-valid',
+      );
+      expect(selesai.receiptQrPayload, isNull);
+      expect(palsu.receiptQrPayload, isNull);
+      expect(sample.receiptQrPayload, isNull);
+    },
+  );
+
+  testWidgets('save and print deliver a PDF and preserve cancellation', (
+    tester,
+  ) async {
+    const channel = MethodChannel('net.nfet.printing');
+    const codec = StandardMethodCodec();
+    final calls = <String>[];
+    Future<dynamic> incoming(String method, Map<String, dynamic> arguments) {
+      final result = Completer<dynamic>();
+      tester.binding.channelBuffers.push(
+        channel.name,
+        codec.encodeMethodCall(MethodCall(method, arguments)),
+        (reply) => result.complete(codec.decodeEnvelope(reply!)),
+      );
+      return result.future;
+    }
+
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+      call,
+    ) async {
+      calls.add(call.method);
+      final args = Map<String, dynamic>.from(call.arguments as Map);
+      if (call.method == 'sharePdf') {
+        expect(args['name'], sample.filename);
+        expect(
+          ascii.decode((args['doc'] as Uint8List).take(5).toList()),
+          '%PDF-',
+        );
+        return 1;
+      }
+      if (call.method == 'printPdf') {
+        expect(args['dynamic'], isFalse);
+        expect((args['width'] as num) / PdfPageFormat.mm, closeTo(80, .001));
+        final bytes = await incoming('onLayout', args) as Uint8List;
+        expect(ascii.decode(bytes.take(5).toList()), '%PDF-');
+        await incoming('onCompleted', {'job': args['job'], 'completed': false});
+        return 0;
+      }
+      throw StateError('Unexpected printing operation');
+    });
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        channel,
+        null,
+      ),
     );
-    const palsu = PatientTicketPdfData(
-      queueNumber: 'PD-001', serviceName: 'Poliklinik', status: 'Dipesan',
-      serviceDate: '3 November 2026', patientName: 'Pasien',
-      reservationCode: 'bukan-token-valid',
+    expect(await tester.runAsync(() => PatientTicketPdf.save(sample)), isTrue);
+    expect(
+      await tester.runAsync(() => PatientTicketPdf.print(sample)),
+      isFalse,
     );
-    expect(selesai.receiptQrPayload, isNull);
-    expect(palsu.receiptQrPayload, isNull);
-    expect(sample.receiptQrPayload, isNull);
+    expect(calls, ['sharePdf', 'printPdf']);
   });
 
   test('Nama PDF tidak memuat path dan identitas pasien', () {

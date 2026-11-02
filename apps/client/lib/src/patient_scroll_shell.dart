@@ -166,8 +166,11 @@ class _PatientScrollShellState extends State<PatientScrollShell>
       return true;
     });
     return const [
+      // Legacy V6 and the V9 native TabBarView scroll keys.
       PageStorageKey('home-walk-in-list'),
       PageStorageKey('home-appointment-list'),
+      PageStorageKey('patient-home-walk-in-scroll'),
+      PageStorageKey('patient-home-appointments-scroll'),
     ].contains(nearest?.key);
   }
 

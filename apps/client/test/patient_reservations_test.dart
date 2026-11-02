@@ -14,6 +14,7 @@ import 'package:queueb_client/src/doctor_professional.dart';
 import 'package:queueb_client/src/doctor_schedule_ui.dart';
 
 import 'ui_test.dart' show FakeBackend, uid;
+import 'patient_test_navigation.dart';
 
 class ReservationBackend extends FakeBackend {
   ReservationBackend() : super('USER') {
@@ -181,7 +182,7 @@ void main() {
       t.view.resetPhysicalSize();
       t.view.resetDevicePixelRatio();
     });
-    await t.tap(find.widgetWithText(NavigationDestination, 'Riwayat'));
+    await t.tap(find.widgetWithText(NavigationDestination, 'Reservasi'));
     await t.pumpAndSettle();
   }
 
@@ -231,7 +232,7 @@ void main() {
         expect(
           find.descendant(
             of: find.byType(ReservationList),
-            matching: find.text('Riwayat'),
+            matching: find.text('Reservasi'),
           ),
           findsOneWidget,
         );
@@ -243,20 +244,19 @@ void main() {
         expect(find.byType(ProfessionalDoctorAvatar), findsWidgets);
         expect(find.text('Batalkan Reservasi'), findsOneWidget);
         await press(t, find.byType(FloatingActionButton));
-        for (final title in [
-          'Cari Dokter',
-          'Pilih Poliklinik',
-          'Jadwal Terdekat',
-        ]) {
+        for (final title in ['Cari Dokter', 'Jadwal Terdekat']) {
           expect(find.text(title), findsOneWidget);
         }
-        expect(find.widgetWithText(FilledButton, 'Lanjutkan'), findsNothing);
+        expect(
+          find.widgetWithText(FilledButton, 'Lanjutkan Reservasi'),
+          findsNothing,
+        );
         expect(t.takeException(), isNull);
         await press(t, find.byTooltip('Tutup pilihan reservasi'));
         expect(
           find.descendant(
             of: find.byType(ReservationList),
-            matching: find.text('Riwayat'),
+            matching: find.text('Reservasi'),
           ),
           findsOneWidget,
         );
@@ -337,7 +337,13 @@ void main() {
     await launch(t, b);
     await press(t, find.widgetWithText(ChoiceChip, 'Dibatalkan'));
     await press(t, find.text('Lihat Detail'));
-    expect(find.text('Tiket UM-004'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('UM-004'),
+      ),
+      findsOneWidget,
+    );
     expect(b.requests.any((r) => r.$2 == '/tiket/cancelled'), isTrue);
     expect(b.requests.any((r) => r.$2.endsWith('/qr')), isFalse);
   });
@@ -350,9 +356,8 @@ void main() {
       await press(t, find.text('Cari Dokter'));
       expect(find.byType(ReservationDoctorChoice), findsOneWidget);
       await press(t, find.text('Pilih Jadwal'));
-      await press(t, find.text('Lihat slot'));
       await press(t, find.text('Sisa slot 2'));
-      await press(t, find.widgetWithText(FilledButton, 'Lanjutkan'));
+      await press(t, find.widgetWithText(FilledButton, 'Lanjutkan Reservasi'));
       await press(t, find.text('Konfirmasi Janji Temu'));
       expect(
         b.requests.where((r) => r.$1 == 'POST' && r.$2 == '/janji-temu').length,
@@ -362,7 +367,10 @@ void main() {
         find.text('Pendaftaran berhasil.'),
         findsNothing,
       ); // full notice contains ticket identity
-      expect(find.textContaining('Pendaftaran berhasil.'), findsOneWidget);
+      expect(
+        find.textContaining('Janji temu berhasil dibuat.'),
+        findsOneWidget,
+      );
     },
   );
   testWidgets(
@@ -370,10 +378,7 @@ void main() {
     (t) async {
       final b = ReservationBackend();
       await launch(t, b);
-      await press(t, find.byType(FloatingActionButton));
-      await press(t, find.text('Pilih Poliklinik'));
-      await press(t, find.text('Poli Umum'));
-      await press(t, find.text('Walk-in'));
+      await openPatientCatalog(t, walkIn: true);
       await press(t, find.text('Reservasi walk-in'));
       await press(t, find.text('Lanjutkan'));
       expect(
@@ -399,7 +404,7 @@ void main() {
         b.requests.any((r) => r.$1 == 'POST' && r.$2 == '/janji-temu'),
         isFalse,
       );
-      await press(t, find.widgetWithText(NavigationDestination, 'Riwayat'));
+      await press(t, find.widgetWithText(NavigationDestination, 'Reservasi'));
       b.slotsAvailable = false;
       await press(t, find.byType(FloatingActionButton));
       await press(t, find.text('Jadwal Terdekat'));
@@ -497,12 +502,14 @@ void main() {
         t.widget<ConsultationSlotGrid>(find.byType(ConsultationSlotGrid)).value,
         isNull,
       );
-      await t.ensureVisible(find.widgetWithText(FilledButton, 'Lanjutkan'));
+      await t.ensureVisible(
+        find.widgetWithText(FilledButton, 'Lanjutkan Reservasi'),
+      );
       await t.pumpAndSettle();
       expect(
         t
             .widget<FilledButton>(
-              find.widgetWithText(FilledButton, 'Lanjutkan'),
+              find.widgetWithText(FilledButton, 'Lanjutkan Reservasi'),
             )
             .onPressed,
         isNull,

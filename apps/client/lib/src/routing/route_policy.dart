@@ -18,6 +18,8 @@ abstract final class RoutePolicy {
     '/admin/consultation-slots',
     '/admin/staff-assignments',
     '/admin/displays',
+    '/admin/reports',
+    '/admin/session-activity',
   ];
   static const patientPaths = [
     '/patient',

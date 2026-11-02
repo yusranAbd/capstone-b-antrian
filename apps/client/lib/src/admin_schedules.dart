@@ -14,22 +14,31 @@ import 'admin_schema.dart';
 import 'admin_ui.dart';
 import 'api.dart';
 import 'config.dart';
+import 'mobile_ui.dart';
 import 'widgets.dart';
 
 String dayLabel(String day) => day[0] + day.substring(1).toLowerCase();
 
 /// Keep the existing selectable appearance and announce ADMIN operation results.
 class AdminNotice extends StatelessWidget {
-  const AdminNotice(this.text, {super.key, this.error = false});
+  const AdminNotice(
+    this.text, {
+    super.key,
+    this.error = false,
+    this.success = false,
+    this.popup = false,
+  });
   final String text;
-  final bool error;
+  final bool error, success, popup;
   @override
-  Widget build(BuildContext context) => Semantics(
-    label: text,
-    liveRegion: true,
-    excludeSemantics: true,
-    child: Notice(text, error: error),
-  );
+  Widget build(BuildContext context) => error || success || popup
+      ? Notice(text, error: error, success: success, popup: popup)
+      : Semantics(
+          label: text,
+          liveRegion: true,
+          excludeSemantics: true,
+          child: Notice(text, error: error),
+        );
 }
 
 class ClinicSchedules {
@@ -212,8 +221,13 @@ class GroupedClinicSchedules extends StatelessWidget {
         if (groups.isEmpty) const Notice('Tidak ada poliklinik yang sesuai.'),
         for (final group in groups)
           Card(
-            margin: const EdgeInsets.symmetric(vertical: 4),
+            margin: const EdgeInsets.only(bottom: 6),
             clipBehavior: Clip.antiAlias,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: QueueBStyle.border),
+            ),
+            elevation: 0,
             child: ExpansionTile(
               dense: true,
               visualDensity: VisualDensity.compact,
@@ -221,19 +235,35 @@ class GroupedClinicSchedules extends StatelessWidget {
               key: PageStorageKey('clinic-schedules-${group.clinic['id']}'),
               expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
               initiallyExpanded: groups.length == 1,
-              title: Text(
-                group.name,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              subtitle: Text(
-                '${group.activeDays} hari aktif · ${group.status}',
+              title: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      group.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${group.activeDays} hari aktif · ${group.status}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: QueueBStyle.muted,
+                    ),
+                  ),
+                ],
               ),
               children: [
                 for (final day in scheduleDays)
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
-                      vertical: 4,
+                      vertical: 2,
                     ),
                     child: Builder(
                       builder: (context) {
@@ -258,10 +288,12 @@ class BulkScheduleEditor extends StatefulWidget {
     required this.api,
     required this.clinics,
     this.repository,
+    this.initialClinicId,
   });
   final QueueApi api;
   final List<Json> clinics;
   final AdminScheduleRepository? repository;
+  final String? initialClinicId;
   @override
   State<BulkScheduleEditor> createState() => _BulkScheduleEditorState();
 }
@@ -284,6 +316,12 @@ class _BulkScheduleEditorState extends State<BulkScheduleEditor> {
   @override
   void initState() {
     super.initState();
+    clinic =
+        widget.clinics.any(
+          (r) => r['id'] == widget.initialClinicId && r['aktif'] == true,
+        )
+        ? widget.initialClinicId
+        : null;
     ownedCatalog = widget.repository == null
         ? AdminCatalogRepository(widget.api)
         : null;
@@ -499,6 +537,16 @@ class _BulkScheduleEditorState extends State<BulkScheduleEditor> {
                     '${results.where((r) => r.outcome == ScheduleOutcome.created).length} berhasil · '
                     '${results.where((r) => r.outcome == ScheduleOutcome.existing).length} dilewati · '
                     '${results.where((r) => r.outcome == ScheduleOutcome.failed || r.outcome == ScheduleOutcome.uncertain).length} gagal/belum terverifikasi',
+                    error: results.any(
+                      (r) =>
+                          r.outcome == ScheduleOutcome.failed ||
+                          r.outcome == ScheduleOutcome.uncertain,
+                    ),
+                    success: results.every(
+                      (r) =>
+                          r.outcome == ScheduleOutcome.created ||
+                          r.outcome == ScheduleOutcome.existing,
+                    ),
                   ),
                   for (final result in results)
                     ListTile(

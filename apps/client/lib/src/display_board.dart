@@ -88,141 +88,224 @@ class DisplayBoard extends StatelessWidget {
   );
 
   Widget _monitor(BuildContext context, Size size) {
-    final large = size.height >= 950;
-    final gap = large ? 20.0 : 12.0;
-    return ColoredBox(
-      color: QueueBStyle.background,
+    final unit = math.min(size.width / 1672, size.height / 941);
+    return CustomPaint(
+      painter: const _DisplayBackdrop(),
       child: Padding(
-        padding: EdgeInsets.all(large ? 28 : 20),
+        padding: EdgeInsets.all(28 * unit),
         child: Column(
           children: [
-            _header(large),
-            SizedBox(height: gap),
-            if (error != null || rejected) ...[
-              _connection(),
-              SizedBox(height: gap),
-            ],
+            _header(unit),
+            SizedBox(height: 32 * unit),
+            if (error != null || rejected) _connection(),
             Expanded(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(flex: 8, child: _hero(large)),
-                  SizedBox(width: gap),
-                  Expanded(flex: 5, child: _waiting(large)),
+                  Expanded(flex: 58, child: _hero(unit)),
+                  SizedBox(width: 20 * unit),
+                  Expanded(flex: 42, child: _waiting(unit)),
                 ],
               ),
             ),
-            SizedBox(height: gap),
-            SizedBox(
-              height: large ? 124 : 94,
-              child: _RoomStrip(rooms: rooms),
-            ),
-            SizedBox(height: gap),
-            _announcement(large),
-            _controls(),
+            _controls(unit),
           ],
         ),
       ),
     );
   }
 
-  Widget _header(bool large) => Row(
-    children: [
-      SizedBox(width: large ? 220 : 196, child: const QueueBBrand()),
-      Container(width: 1, height: 52, color: QueueBStyle.border),
-      const SizedBox(width: 20),
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${object(snapshot?['layanan'])['nama'] ?? 'Public Display'}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: large ? 36 : 28,
-                height: 1.15,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Row(
+  Widget _header(double unit) {
+    final connected = live && error == null && !rejected;
+    final statusInk = connected
+        ? const Color(0xff06784d)
+        : rejected
+        ? QueueBStyle.danger
+        : QueueBStyle.warning;
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 28 * unit, vertical: 14 * unit),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28 * unit),
+        border: Border.all(color: QueueBStyle.border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x121e468e),
+            blurRadius: 22,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 262 * unit,
+            child: Row(
               children: [
-                Icon(
-                  live && error == null ? Icons.sensors : Icons.sensors_off,
-                  size: 16,
-                  color: live && error == null
-                      ? QueueBStyle.success
-                      : QueueBStyle.warning,
+                Container(
+                  width: 72 * unit,
+                  height: 72 * unit,
+                  decoration: BoxDecoration(
+                    color: const Color(0xff315ddb),
+                    borderRadius: BorderRadius.circular(20 * unit),
+                  ),
+                  child: Icon(
+                    Icons.local_hospital_rounded,
+                    size: 52 * unit,
+                    color: Colors.white,
+                  ),
                 ),
-                const SizedBox(width: 6),
+                SizedBox(width: 16 * unit),
                 Expanded(
-                  child: Text(
-                    rejected ? 'Akses ditolak' : status,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: QueueBStyle.muted,
-                      fontSize: 13,
+                  child: Text.rich(
+                    const TextSpan(
+                      children: [
+                        TextSpan(
+                          text: 'QueueB\n',
+                          style: TextStyle(color: Color(0xff101e4a)),
+                        ),
+                        TextSpan(
+                          text: 'Hospital',
+                          style: TextStyle(color: Color(0xff315ddb)),
+                        ),
+                      ],
+                    ),
+                    style: TextStyle(
+                      fontSize: 42 * unit,
+                      height: .98,
+                      letterSpacing: -.8 * unit,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+          SizedBox(width: 24 * unit),
+          Container(
+            width: 1,
+            height: 78 * unit,
+            color: const Color(0xffcbd7fa),
+          ),
+          SizedBox(width: 32 * unit),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${object(rejected ? null : snapshot?['layanan'])['nama'] ?? 'Public Display'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 44 * unit,
+                    height: 1.1,
+                    letterSpacing: -.7 * unit,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xff101e4a),
+                  ),
+                ),
+                SizedBox(height: 7 * unit),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 16 * unit,
+                      vertical: 7 * unit,
+                    ),
+                    decoration: BoxDecoration(
+                      color: connected
+                          ? const Color(0xffdef4ea)
+                          : statusInk.withValues(alpha: .09),
+                      borderRadius: BorderRadius.circular(16 * unit),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          connected
+                              ? Icons.sensors_rounded
+                              : Icons.sensors_off_rounded,
+                          size: 25 * unit,
+                          color: statusInk,
+                        ),
+                        SizedBox(width: 10 * unit),
+                        Flexible(
+                          child: Text(
+                            rejected ? 'Akses ditolak' : status,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 21 * unit,
+                              height: 1.15,
+                              fontWeight: FontWeight.w600,
+                              color: statusInk,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: 24 * unit),
+          if (clock == null)
+            _clock(now, unit)
+          else
+            ValueListenableBuilder<DateTime>(
+              valueListenable: clock!,
+              builder: (_, value, _) => _clock(value, unit),
+            ),
+        ],
       ),
-      const SizedBox(width: 20),
-      if (clock == null)
-        _clock(now, large)
-      else
-        ValueListenableBuilder<DateTime>(
-          valueListenable: clock!,
-          builder: (_, value, _) => _clock(value, large),
-        ),
-    ],
-  );
+    );
+  }
 
-  Widget _clock(DateTime value, bool large) => Column(
+  Widget _clock(DateTime value, double unit) => Column(
+    mainAxisSize: MainAxisSize.min,
     crossAxisAlignment: CrossAxisAlignment.end,
     children: [
       Text(
         '${two(value.hour)}:${two(value.minute)}:${two(value.second)}',
         key: const ValueKey('display-clock'),
         style: TextStyle(
-          fontSize: large ? 40 : 30,
-          fontFeatures: const [FontFeature.tabularFigures()],
-          height: 1.1,
+          fontSize: 52 * unit,
+          height: 1.05,
+          letterSpacing: -.6 * unit,
           fontWeight: FontWeight.w800,
+          color: const Color(0xff101e4a),
+          fontFeatures: const [FontFeature.tabularFigures()],
         ),
       ),
+      SizedBox(height: 5 * unit),
       Text(
         _date(value),
-        style: TextStyle(fontSize: large ? 18 : 14, color: QueueBStyle.muted),
-      ),
-    ],
-  );
-
-  Widget _connection() => Row(
-    children: [
-      const Icon(Icons.info_outline, size: 16, color: QueueBStyle.danger),
-      const SizedBox(width: 8),
-      Expanded(
-        child: Text(
-          rejected
-              ? error ?? 'Akses display ditolak · periksa konfigurasi perangkat'
-              : 'Snapshot belum tersinkron · menampilkan data terakhir',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: QueueBStyle.danger, fontSize: 14),
+        style: TextStyle(
+          fontSize: 24 * unit,
+          height: 1.2,
+          color: QueueBStyle.muted,
         ),
       ),
     ],
   );
 
-  Widget _hero(bool large) {
-    final call = currentCall(snapshot);
-    final announcement = object(snapshot?['pengumumanTerakhir']);
+  Widget _connection() => MobileNotice(
+    error ??
+        (rejected
+            ? 'Akses display ditolak · periksa konfigurasi perangkat'
+            : snapshot == null
+            ? 'Koneksi terganggu · menunggu data antrean'
+            : 'Snapshot belum tersinkron · menampilkan data terakhir'),
+    error: true,
+  );
+
+  Widget _hero(double unit) {
+    final visibleSnapshot = rejected ? null : snapshot;
+    final call = currentCall(visibleSnapshot);
+    final announcement = object(visibleSnapshot?['pengumumanTerakhir']);
+    final name = call?.ticket['namaPasien'];
     return QueueBValueMotion(
       value: (
         call?.room['kode'],
@@ -230,41 +313,60 @@ class DisplayBoard extends StatelessWidget {
         announcement['peristiwaId'],
       ),
       scope: (
-        object(snapshot?['layanan'])['kode'],
-        snapshot?['tanggalPelayanan'],
+        object(visibleSnapshot?['layanan'])['kode'],
+        visibleSnapshot?['tanggalPelayanan'],
       ),
-      available: snapshot != null && !rejected,
+      available: visibleSnapshot != null,
       highlight: true,
       animateChild: false,
       borderOnly: true,
-      radius: 20,
+      radius: 28 * unit,
       highlightColor: QueueBStyle.mint,
       child: Container(
         key: const ValueKey('display-call-panel'),
-        padding: EdgeInsets.all(large ? 28 : 20),
+        padding: EdgeInsets.all(26 * unit),
         decoration: BoxDecoration(
-          color: QueueBStyle.hero,
-          borderRadius: BorderRadius.circular(20),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xff3063d6), Color(0xff2855c7)],
+          ),
+          borderRadius: BorderRadius.circular(28 * unit),
+          border: Border.all(color: const Color(0xff3968df)),
         ),
         child: DefaultTextStyle.merge(
-          style: const TextStyle(color: Colors.white, fontSize: 20),
+          style: TextStyle(color: Colors.white, fontSize: 24 * unit),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.campaign_outlined,
                     color: Colors.white,
-                    size: 24,
+                    size: 48 * unit,
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      call == null ? 'INFORMASI PANGGILAN' : 'SEDANG DIPANGGIL',
-                      style: TextStyle(
-                        fontSize: large ? 22 : 18,
-                        fontWeight: FontWeight.w600,
+                  SizedBox(width: 16 * unit),
+                  Flexible(
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 22 * unit,
+                        vertical: 10 * unit,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: .13),
+                        borderRadius: BorderRadius.circular(22 * unit),
+                      ),
+                      child: Text(
+                        call == null
+                            ? 'INFORMASI PANGGILAN'
+                            : 'SEDANG DIPANGGIL',
+                        style: TextStyle(
+                          fontSize: 30 * unit,
+                          height: 1.1,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: .2 * unit,
+                        ),
                       ),
                     ),
                   ),
@@ -278,20 +380,21 @@ class DisplayBoard extends StatelessWidget {
                       child: QueueBValueMotion(
                         value: (call.room['kode'], call.ticket['nomorAntrean']),
                         scope: (
-                          object(snapshot?['layanan'])['kode'],
-                          snapshot?['tanggalPelayanan'],
+                          object(visibleSnapshot?['layanan'])['kode'],
+                          visibleSnapshot?['tanggalPelayanan'],
                         ),
-                        available: snapshot != null && !rejected,
+                        available: visibleSnapshot != null,
                         duration: QueueBMotion.display,
                         child: Text(
                           '${call.ticket['nomorAntrean']}',
                           key: const ValueKey('display-call-number'),
+                          maxLines: 1,
                           style: TextStyle(
-                            fontSize: large ? 320 : 240,
+                            fontSize: 420 * unit,
                             height: 1,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w800,
                             color: Colors.white,
-                            letterSpacing: -4,
+                            letterSpacing: -6 * unit,
                             fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         ),
@@ -299,63 +402,74 @@ class DisplayBoard extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (call.ticket['namaPasien'] is String)
+                if (name is String && name.trim().isNotEmpty)
                   Text(
-                    '${call.ticket['namaPasien']}',
+                    name,
                     key: const ValueKey('display-call-name'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: large ? 38 : 28,
-                      height: 1.15,
+                      fontSize: 56 * unit,
+                      height: 1.1,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                const SizedBox(height: 12),
+                SizedBox(height: 24 * unit),
                 Container(
                   key: const ValueKey('display-call-destination'),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 24 * unit,
+                    vertical: 16 * unit,
                   ),
                   decoration: BoxDecoration(
-                    color: QueueBStyle.console,
-                    borderRadius: BorderRadius.circular(12),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xff17377c), Color(0xff1c3c85)],
+                    ),
+                    borderRadius: BorderRadius.circular(26 * unit),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.meeting_room_outlined,
                         color: Colors.white,
-                        size: 26,
+                        size: 60 * unit,
                       ),
-                      const SizedBox(width: 10),
+                      Container(
+                        width: 1,
+                        height: 76 * unit,
+                        color: const Color(0xffb8cbff),
+                        margin: EdgeInsets.symmetric(horizontal: 28 * unit),
+                      ),
                       Flexible(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'Loket ${call.room['kode']}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: large ? 34 : 26,
-                                height: 1.1,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                'Loket ${call.room['kode'] ?? '—'}',
+                                maxLines: 1,
+                                style: TextStyle(
+                                  fontSize: 44 * unit,
+                                  height: 1.05,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 2),
+                            SizedBox(height: 4 * unit),
                             Text(
-                              '${call.room['nama']}',
-                              textAlign: TextAlign.center,
-                              maxLines: 1,
+                              '${call.room['nama'] ?? '—'}',
+                              maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: large ? 24 : 20,
+                                fontSize: 32 * unit,
                                 height: 1.1,
+                                color: const Color(0xffd3e0ff),
                               ),
                             ),
                           ],
@@ -365,33 +479,46 @@ class DisplayBoard extends StatelessWidget {
                   ),
                 ),
               ] else ...[
-                const Spacer(),
-                if (snapshot == null && !rejected && error == null)
-                  const Center(
-                    child: CircularProgressIndicator(color: Colors.white),
-                  ),
-                const SizedBox(height: 16),
-                Text(
-                  rejected
-                      ? 'Akses display ditolak'
-                      : snapshot == null
-                      ? error == null
-                            ? 'Memuat antrean…'
-                            : 'Menunggu koneksi'
-                      : 'Belum ada nomor dipanggil.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: large ? 44 : 32,
-                    fontWeight: FontWeight.w800,
+                Expanded(
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (visibleSnapshot == null &&
+                            !rejected &&
+                            error == null) ...[
+                          const CircularProgressIndicator(color: Colors.white),
+                          SizedBox(height: 18 * unit),
+                        ],
+                        Text(
+                          rejected
+                              ? 'Akses display ditolak'
+                              : visibleSnapshot == null
+                              ? error == null
+                                    ? 'Memuat antrean…'
+                                    : 'Menunggu koneksi'
+                              : 'Belum ada nomor dipanggil.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 44 * unit,
+                            height: 1.2,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        SizedBox(height: 16 * unit),
+                        Text(
+                          'Perhatikan layar dan dengarkan panggilan petugas.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 24 * unit,
+                            height: 1.3,
+                            color: const Color(0xffe4edff),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Perhatikan layar dan dengarkan panggilan petugas.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 18, color: QueueBStyle.mint),
-                ),
-                const Spacer(),
               ],
             ],
           ),
@@ -400,104 +527,157 @@ class DisplayBoard extends StatelessWidget {
     );
   }
 
-  Widget _waiting(bool large) =>
-      _PatientQueue(snapshot: snapshot, large: large);
-
-  Widget _announcement(bool large) => Container(
-    padding: EdgeInsets.symmetric(horizontal: 18, vertical: large ? 16 : 10),
-    decoration: BoxDecoration(
-      color: QueueBStyle.mint,
-      borderRadius: BorderRadius.circular(14),
-    ),
-    child: Row(
-      children: [
-        const Icon(
-          Icons.volume_up_outlined,
-          color: QueueBStyle.darkTeal,
-          size: 26,
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Text(
-            '${object(snapshot?['pengumumanTerakhir'])['teks'] ?? 'Pengumuman panggilan akan tampil di sini.'}',
-            key: const ValueKey('display-announcement'),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: large ? 26 : 20,
-              height: 1.2,
-              fontWeight: FontWeight.w600,
-              color: QueueBStyle.navy,
-            ),
-          ),
-        ),
-      ],
-    ),
+  Widget _waiting(double unit) => _PatientQueue(
+    key: ValueKey((
+      object(snapshot?['layanan'])['kode'],
+      snapshot?['tanggalPelayanan'],
+      rejected,
+    )),
+    snapshot: rejected ? null : snapshot,
+    unit: unit,
+    rejected: rejected,
+    failed: error != null,
   );
 
-  Widget _controls() => Padding(
-    padding: const EdgeInsets.only(top: 4),
+  Widget _controls(double unit) => Padding(
+    padding: EdgeInsets.only(top: 8 * unit),
     child: TextButtonTheme(
       data: TextButtonThemeData(
         style: TextButton.styleFrom(
-          minimumSize: const Size(40, 40),
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          foregroundColor: const Color(0xff2451cf),
+          minimumSize: const Size(44, 44),
+          padding: EdgeInsets.symmetric(
+            horizontal: 12 * unit,
+            vertical: 8 * unit,
+          ),
+          textStyle: TextStyle(
+            fontSize: 18 * unit,
+            fontWeight: FontWeight.w500,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10 * unit),
+          ),
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: Text(
-              audioError ??
-                  (audio ? 'Audio aktif · Bahasa Indonesia' : 'Audio nonaktif'),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                color: audioError == null
-                    ? QueueBStyle.muted
-                    : QueueBStyle.danger,
-              ),
+          if (audioError != null) MobileNotice(audioError!, error: true),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Wrap(
+              spacing: 8 * unit,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              alignment: WrapAlignment.end,
+              children: [
+                if (!rejected) ...[
+                  TextButton.icon(
+                    onPressed: audioBusy ? null : onAudio,
+                    icon: Icon(
+                      audio
+                          ? Icons.volume_up_rounded
+                          : Icons.volume_off_outlined,
+                      size: 25 * unit,
+                    ),
+                    label: Text(audio ? 'Matikan suara' : 'Aktifkan suara'),
+                  ),
+                  _controlDivider(unit),
+                  TextButton.icon(
+                    onPressed: onRefresh,
+                    icon: Icon(Icons.refresh_rounded, size: 25 * unit),
+                    label: const Text('Muat ulang'),
+                  ),
+                  _controlDivider(unit),
+                ],
+                if (fullscreenSupported) ...[
+                  TextButton.icon(
+                    onPressed: onFullscreen,
+                    icon: Icon(
+                      fullscreen
+                          ? Icons.fullscreen_exit_rounded
+                          : Icons.fullscreen_rounded,
+                      size: 25 * unit,
+                    ),
+                    label: Text(
+                      fullscreen ? 'Keluar layar penuh' : 'Layar penuh',
+                    ),
+                  ),
+                  _controlDivider(unit),
+                ],
+                TextButton.icon(
+                  onPressed: onConfigure,
+                  icon: Icon(Icons.settings_outlined, size: 25 * unit),
+                  label: const Text('Ganti perangkat'),
+                ),
+              ],
             ),
-          ),
-          if (!rejected) ...[
-            TextButton.icon(
-              onPressed: audioBusy ? null : onAudio,
-              icon: Icon(audio ? Icons.volume_up : Icons.volume_off, size: 18),
-              label: Text(audio ? 'Matikan suara' : 'Aktifkan suara'),
-            ),
-            TextButton.icon(
-              onPressed: onRefresh,
-              icon: const Icon(Icons.refresh, size: 18),
-              label: const Text('Muat ulang'),
-            ),
-          ],
-          if (fullscreenSupported)
-            TextButton.icon(
-              onPressed: onFullscreen,
-              icon: Icon(
-                fullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
-                size: 18,
-              ),
-              label: Text(fullscreen ? 'Keluar fullscreen' : 'Layar penuh'),
-            ),
-          TextButton.icon(
-            onPressed: onConfigure,
-            icon: const Icon(Icons.settings_outlined, size: 18),
-            label: const Text('Ganti perangkat'),
           ),
         ],
       ),
     ),
   );
+
+  Widget _controlDivider(double unit) =>
+      Container(width: 1, height: 28 * unit, color: const Color(0xffd3dcf7));
+}
+
+class _DisplayBackdrop extends CustomPainter {
+  const _DisplayBackdrop();
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xfff1f5ff), Color(0xffeaf0ff), Color(0xfff8faff)],
+        ).createShader(Offset.zero & size),
+    );
+    final wave = Path()
+      ..moveTo(0, size.height * .94)
+      ..cubicTo(
+        size.width * .18,
+        size.height * .86,
+        size.width * .25,
+        size.height * 1.08,
+        size.width * .55,
+        size.height,
+      )
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(wave, Paint()..color = const Color(0x99dae5ff));
+    final right = Path()
+      ..moveTo(size.width * .7, size.height)
+      ..quadraticBezierTo(
+        size.width * .88,
+        size.height * .97,
+        size.width,
+        size.height * .88,
+      )
+      ..lineTo(size.width, size.height)
+      ..close();
+    canvas.drawPath(right, Paint()..color = const Color(0x99e4ebff));
+  }
+
+  @override
+  bool shouldRepaint(covariant _DisplayBackdrop oldDelegate) => false;
 }
 
 /// Read-only patient list. Paging includes skipped tickets without changing CALL order.
 class _PatientQueue extends StatefulWidget {
-  const _PatientQueue({required this.snapshot, required this.large});
+  const _PatientQueue({
+    super.key,
+    required this.snapshot,
+    required this.unit,
+    this.rejected = false,
+    this.failed = false,
+  });
   final Json? snapshot;
-  final bool large;
+  final double unit;
+  final bool rejected, failed;
   @override
   State<_PatientQueue> createState() => _PatientQueueState();
 }
@@ -505,7 +685,6 @@ class _PatientQueue extends StatefulWidget {
 class _PatientQueueState extends State<_PatientQueue> {
   int page = 0, pagesAvailable = 1;
   Timer? timer;
-
   @override
   void initState() {
     super.initState();
@@ -522,352 +701,313 @@ class _PatientQueueState extends State<_PatientQueue> {
 
   @override
   Widget build(BuildContext context) {
-    final snapshot = widget.snapshot;
-    final large = widget.large;
+    final snapshot = widget.snapshot, unit = widget.unit;
     final patients = snapshot?['antrianPasien'] is List
         ? rows(snapshot?['antrianPasien'])
         : [
             for (final row in rows(snapshot?['menunggu']))
               {...row, 'status': 'MENUNGGU'},
           ];
-    final total =
-        (snapshot?['totalAntrianPasien'] ?? snapshot?['totalMenunggu']) as int?;
+    final rawTotal =
+        snapshot?['totalAntrianPasien'] ?? snapshot?['totalMenunggu'];
+    final total = rawTotal is num
+        ? rawTotal.toInt()
+        : int.tryParse('$rawTotal');
     return Container(
       key: const ValueKey('display-waiting-panel'),
-      padding: EdgeInsets.all(large ? 22 : 16),
+      padding: EdgeInsets.all(20 * unit),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(28 * unit),
         border: Border.all(color: QueueBStyle.border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x071e468e),
+            blurRadius: 14,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.groups_outlined,
-                color: QueueBStyle.darkTeal,
-                size: 28,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Antrian pasien',
-                  style: TextStyle(
-                    fontSize: large ? 28 : 22,
-                    fontWeight: FontWeight.w800,
-                  ),
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final rowWidth = math.max(0.0, box.maxWidth - 36 * unit);
+          final numberWidth = rowWidth * .24;
+          final statusWidth = rowWidth * .34;
+          final fontScale =
+              MediaQuery.textScalerOf(context).scale(28 * unit) / (28 * unit);
+          final rowHeight = math.max(
+            84 * unit,
+            MediaQuery.textScalerOf(context).scale(28 * unit) * 2.2 + 20 * unit,
+          );
+          final rowGap = 14 * unit;
+          Widget status(Json row) {
+            final skipped = row['status'] == 'DILEWATI';
+            final waiting = row['status'] == 'MENUNGGU';
+            final ink = skipped ? QueueBStyle.warning : const Color(0xff2449b7);
+            return Align(
+              alignment: Alignment.centerRight,
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: 14 * unit,
+                  vertical: 8 * unit,
                 ),
-              ),
-              Text(
-                '${total ?? '—'}',
-                key: const ValueKey('display-waiting-count'),
-                style: TextStyle(
-                  fontSize: large ? 40 : 32,
-                  fontWeight: FontWeight.w900,
-                  color: QueueBStyle.darkTeal,
+                decoration: BoxDecoration(
+                  color: skipped
+                      ? const Color(0xfffff0d8)
+                      : const Color(0xffe2eaff),
+                  borderRadius: BorderRadius.circular(18 * unit),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-            decoration: BoxDecoration(
-              color: QueueBStyle.background,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: large ? 144 : 112,
-                  child: const Text(
-                    'NOMOR',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: QueueBStyle.muted,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      skipped
+                          ? Icons.pause_circle_outline_rounded
+                          : Icons.schedule_rounded,
+                      size: 25 * unit,
+                      color: ink,
                     ),
-                  ),
-                ),
-                const Expanded(
-                  child: Text(
-                    'NAMA PASIEN',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: QueueBStyle.muted,
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  width: large ? 112 : 94,
-                  child: const Text(
-                    'STATUS',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: QueueBStyle.muted,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (_, bounds) {
-                if (patients.isEmpty) {
-                  pagesAvailable = 1;
-                  return Center(
-                    child: Text(
-                      snapshot == null
-                          ? 'Menunggu snapshot…'
-                          : total == 0
-                          ? 'Belum ada antrian pasien.'
-                          : 'Daftar pasien belum tersedia.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: large ? 24 : 20,
-                        color: QueueBStyle.muted,
+                    SizedBox(width: 8 * unit),
+                    Flexible(
+                      child: Text(
+                        skipped
+                            ? 'Dilewati'
+                            : waiting
+                            ? 'Menunggu'
+                            : '—',
+                        style: TextStyle(
+                          fontSize: 22 * unit,
+                          height: 1.1,
+                          fontWeight: FontWeight.w600,
+                          color: ink,
+                        ),
                       ),
                     ),
-                  );
-                }
-                final extent = large ? 68.0 : 52.0;
-                final capacity = math.max(
-                  1,
-                  ((bounds.maxHeight - 28) / extent).floor(),
-                );
-                final pages = (patients.length / capacity).ceil();
-                pagesAvailable = pages;
-                final currentPage = page % pages;
-                final shown = patients
-                    .skip(currentPage * capacity)
-                    .take(capacity);
-                final remaining = math.max(
-                  0,
-                  (total ?? patients.length) - patients.length,
-                );
-                return Column(
-                  children: [
-                    for (final row in shown)
+                  ],
+                ),
+              ),
+            );
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.groups_rounded,
+                    color: const Color(0xff2f58d4),
+                    size: 48 * unit,
+                  ),
+                  SizedBox(width: 16 * unit),
+                  Expanded(
+                    child: Text(
+                      'Antrean pasien',
+                      style: TextStyle(
+                        fontSize: 38 * unit,
+                        height: 1.15,
+                        letterSpacing: -.4 * unit,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xff101e4a),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 12 * unit),
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 20 * unit,
+                      vertical: 8 * unit,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xffe3eaff),
+                      borderRadius: BorderRadius.circular(20 * unit),
+                    ),
+                    child: Text(
+                      '${total ?? '—'}',
+                      key: const ValueKey('display-waiting-count'),
+                      style: TextStyle(
+                        fontSize: 46 * unit,
+                        height: 1.05,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xff2f58d4),
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 24 * unit),
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: 18 * unit,
+                  vertical: 16 * unit,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xffebf0ff),
+                  borderRadius: BorderRadius.circular(18 * unit),
+                ),
+                child: DefaultTextStyle(
+                  style: TextStyle(
+                    fontSize: 22 * unit,
+                    height: 1.2,
+                    fontWeight: FontWeight.w600,
+                    color: QueueBStyle.muted,
+                  ),
+                  child: Row(
+                    children: [
+                      SizedBox(width: numberWidth, child: const Text('NOMOR')),
+                      const Expanded(child: Text('NAMA PASIEN')),
                       SizedBox(
-                        height: extent,
-                        child: DecoratedBox(
-                          decoration: const BoxDecoration(
-                            border: Border(
-                              bottom: BorderSide(color: QueueBStyle.border),
-                            ),
+                        width: statusWidth,
+                        child: const Text(
+                          'STATUS',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(height: rowGap),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, bounds) {
+                    if (patients.isEmpty) {
+                      pagesAvailable = 1;
+                      return Center(
+                        child: Text(
+                          widget.rejected
+                              ? 'Akses display ditolak.'
+                              : snapshot == null
+                              ? widget.failed
+                                    ? 'Menunggu koneksi…'
+                                    : 'Memuat antrean…'
+                              : total == 0
+                              ? 'Belum ada antrean pasien.'
+                              : 'Daftar pasien belum tersedia.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 26 * unit,
+                            height: 1.3,
+                            color: QueueBStyle.muted,
                           ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: Row(
-                              children: [
-                                SizedBox(
-                                  width: large ? 144 : 112,
-                                  child: Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      child: Text(
-                                        '${row['nomorAntrean']}',
-                                        maxLines: 1,
-                                        style: TextStyle(
-                                          fontSize: large ? 30 : 23,
-                                          fontWeight: FontWeight.w800,
-                                          color: QueueBStyle.darkTeal,
+                        ),
+                      );
+                    }
+                    final footerHeight = 44 * unit * fontScale;
+                    final capacity = math.max(
+                      1,
+                      ((bounds.maxHeight - footerHeight + rowGap) /
+                              (rowHeight + rowGap))
+                          .floor(),
+                    );
+                    final pages = (patients.length / capacity).ceil();
+                    pagesAvailable = pages;
+                    final currentPage = page % pages;
+                    final shown = patients
+                        .skip(currentPage * capacity)
+                        .take(capacity)
+                        .toList();
+                    final remaining = math.max(
+                      0,
+                      (total ?? patients.length) - patients.length,
+                    );
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (var i = 0; i < shown.length; i++) ...[
+                          if (i > 0) SizedBox(height: rowGap),
+                          SizedBox(
+                            height: rowHeight,
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 18 * unit,
+                                vertical: 9 * unit,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xfff3f6ff),
+                                borderRadius: BorderRadius.circular(18 * unit),
+                              ),
+                              child: Row(
+                                children: [
+                                  SizedBox(
+                                    width: numberWidth,
+                                    child: Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          '${shown[i]['nomorAntrean'] ?? '—'}',
+                                          maxLines: 1,
+                                          style: TextStyle(
+                                            fontSize: 34 * unit,
+                                            height: 1.1,
+                                            fontWeight: FontWeight.w800,
+                                            color: const Color(0xff101e4a),
+                                            fontFeatures: const [
+                                              FontFeature.tabularFigures(),
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                ),
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: Text(
-                                      '${row['namaPasien'] ?? '—'}',
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: large ? 26 : 20,
-                                        height: 1.1,
-                                        fontWeight: FontWeight.w500,
+                                  Expanded(
+                                    child: Padding(
+                                      padding: EdgeInsets.only(
+                                        right: 10 * unit,
+                                      ),
+                                      child: Text(
+                                        '${shown[i]['namaPasien'] ?? '—'}',
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 28 * unit,
+                                          height: 1.1,
+                                          fontWeight: FontWeight.w500,
+                                          color: const Color(0xff101e4a),
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                                SizedBox(
-                                  width: large ? 112 : 94,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 5,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: row['status'] == 'DILEWATI'
-                                          ? const Color(0xFFFFF3DF)
-                                          : QueueBStyle.mint,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      row['status'] == 'DILEWATI'
-                                          ? 'Dilewati'
-                                          : row['status'] == 'MENUNGGU'
-                                          ? 'Menunggu'
-                                          : '—',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: large ? 18 : 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: row['status'] == 'DILEWATI'
-                                            ? QueueBStyle.warning
-                                            : QueueBStyle.darkTeal,
-                                      ),
-                                    ),
+                                  SizedBox(
+                                    width: statusWidth,
+                                    child: status(shown[i]),
                                   ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                        const Spacer(),
+                        if (pages > 1 || remaining > 0)
+                          SizedBox(
+                            height: footerHeight,
+                            child: Align(
+                              alignment: Alignment.bottomRight,
+                              child: Text(
+                                '${currentPage + 1}/$pages · ${total ?? patients.length} antrean${remaining > 0 ? ' · $remaining antrean belum ditampilkan' : ''}',
+                                key: const ValueKey('display-more-waiting'),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.right,
+                                style: TextStyle(
+                                  fontSize: 16 * unit,
+                                  height: 1.2,
+                                  fontWeight: FontWeight.w600,
+                                  color: QueueBStyle.muted,
                                 ),
-                              ],
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                    const Spacer(),
-                    if (pages > 1 || remaining > 0)
-                      SizedBox(
-                        height: 28,
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            '${currentPage + 1}/$pages · ${total ?? patients.length} pasien'
-                            '${remaining > 0 ? ' · +$remaining di luar batas snapshot' : ''}',
-                            key: const ValueKey('display-more-waiting'),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: QueueBStyle.muted,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Fixed-height room cards, paged automatically without any scroll surface.
-class _RoomStrip extends StatefulWidget {
-  const _RoomStrip({required this.rooms});
-  final List<Json> rooms;
-  @override
-  State<_RoomStrip> createState() => _RoomStripState();
-}
-
-class _RoomStripState extends State<_RoomStrip> {
-  int page = 0, pagesAvailable = 1;
-  Timer? timer;
-  @override
-  void initState() {
-    super.initState();
-    timer = Timer.periodic(const Duration(seconds: 12), (_) {
-      if (mounted && pagesAvailable > 1) setState(() => page++);
-    });
-  }
-
-  @override
-  void dispose() {
-    timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (_, bounds) {
-      final rooms = widget.rooms;
-      if (rooms.isEmpty) {
-        return Center(
-          child: Text(
-            'Belum ada ruang pelayanan aktif.',
-            style: const TextStyle(color: QueueBStyle.muted, fontSize: 18),
-          ),
-        );
-      }
-      final capacity = (bounds.maxWidth / 204).floor().clamp(1, 8);
-      final pages = (rooms.length / capacity).ceil();
-      pagesAvailable = pages;
-      final offset = (page % pages) * capacity;
-      final shown = rooms.skip(offset).take(capacity).toList();
-      return Row(
-        children: [
-          for (var n = 0; n < shown.length; n++) ...[
-            if (n > 0) const SizedBox(width: 10),
-            Expanded(child: _room(shown[n])),
-          ],
-          if (pages > 1)
-            Padding(
-              padding: const EdgeInsets.only(left: 10),
-              child: Text(
-                '${page % pages + 1}/$pages',
-                style: const TextStyle(color: QueueBStyle.muted),
-              ),
-            ),
-        ],
-      );
-    },
-  );
-  Widget _room(Json room) {
-    final tickets = rows(room['tiketAktif']);
-    final called = tickets.any((t) => t['status'] == 'DIPANGGIL');
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: called ? QueueBStyle.mint : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: called ? QueueBStyle.teal : QueueBStyle.border,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            '${room['nama']}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-          ),
-          Expanded(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  tickets.isEmpty
-                      ? 'Siap melayani'
-                      : tickets.map((t) => '${t['nomorAntrean']}').join(' · '),
-                  style: TextStyle(
-                    fontSize: tickets.isEmpty ? 17 : 30,
-                    fontWeight: FontWeight.w800,
-                    color: QueueBStyle.darkTeal,
-                  ),
+                      ],
+                    );
+                  },
                 ),
               ),
-            ),
-          ),
-          Text(
-            'Loket ${room['kode']} · ${tickets.isEmpty
-                ? 'Tersedia'
-                : called
-                ? 'Dipanggil'
-                : 'Sedang dilayani'}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 13, color: QueueBStyle.muted),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }

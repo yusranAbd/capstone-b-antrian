@@ -7,7 +7,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import { HariLayanan, ModeReservasi, Prisma, StatusTiket } from '../generated/prisma/client';
+import {
+  HariLayanan,
+  ModeReservasi,
+  Prisma,
+  StatusTiket,
+} from '../generated/prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReservasiDto } from './dto/create-reservasi.dto';
@@ -84,7 +89,9 @@ export class ReservasiService {
             // Layanan HIBRIDA tetap boleh menerima reservasi walk-in.
             // Hanya mode JANJI_TEMU_DOKTER eksklusif yang menolaknya.
             if (layanan.modeReservasi === ModeReservasi.JANJI_TEMU_DOKTER) {
-              throw new BadRequestException('Gunakan API janji temu untuk layanan dokter');
+              throw new BadRequestException(
+                'Gunakan API janji temu untuk layanan dokter',
+              );
             }
 
             // 2. Periksa jadwal pada hari tersebut.
@@ -190,6 +197,13 @@ export class ReservasiService {
                 nomorUrut: counter.nomorTerakhir,
                 kodeTiket,
                 status: StatusTiket.DIPESAN,
+                peristiwaAntrean: {
+                  create: {
+                    aktorId: penggunaId,
+                    tipe: 'RESERVATION_BOOK',
+                    statusSesudah: StatusTiket.DIPESAN,
+                  },
+                },
               },
               select: pilihTiket,
             });

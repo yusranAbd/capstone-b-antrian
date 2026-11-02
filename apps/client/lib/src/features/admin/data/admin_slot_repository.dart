@@ -34,6 +34,8 @@ class AdminSlotRepository {
       );
     }
     final snapshot = immutableSlotRows(rows(result));
+    await catalog.refresh([adminReadinessPath]);
+    check();
     _unverified.remove(sessionId);
     return snapshot;
   }

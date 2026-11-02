@@ -1,5 +1,6 @@
 import {
   IsBoolean,
+  IsEnum,
   IsInt,
   IsOptional,
   IsString,
@@ -10,8 +11,13 @@ import {
   MinLength,
   ValidateIf,
 } from 'class-validator';
+import { KategoriLayanan } from '../../generated/prisma/client';
 
 export class UpdateLayananDto {
+  @ValidateIf((_, value: unknown) => value !== undefined)
+  @IsEnum(KategoriLayanan)
+  kategori?: KategoriLayanan;
+
   @ValidateIf((_, value: unknown) => value !== undefined)
   @IsString()
   @Matches(/^[A-Z0-9]{2,20}$/)

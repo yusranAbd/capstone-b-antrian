@@ -57,6 +57,22 @@ const resources = [
     AdminField('kode', 'Kode', pattern: r'[A-Z0-9]{2,20}', maxLength: 20),
     _name,
     AdminField(
+      'kategori',
+      'Kategori layanan',
+      kind: FieldKind.choice,
+      initial: 'POLIKLINIK',
+      options: [
+        'POLIKLINIK',
+        'PENDAFTARAN',
+        'APOTEK',
+        'LABORATORIUM',
+        'RADIOLOGI',
+        'KASIR',
+        'REKAM_MEDIS',
+        'LAINNYA',
+      ],
+    ),
+    AdminField(
       'deskripsi',
       'Deskripsi',
       required: false,

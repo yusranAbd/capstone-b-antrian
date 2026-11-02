@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'queueb_feedback.dart';
+
 import 'config.dart';
 import 'mobile_ui.dart';
 import 'patient_design.dart';
@@ -73,15 +75,9 @@ class PatientInformation extends StatelessWidget {
                   child: LinearProgressIndicator(),
                 ),
               if (error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(error!),
-                ),
+                QueueBPopupNotice(error!, kind: QueueBFeedbackKind.error),
               if (hoursError != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(hoursError!),
-                ),
+                QueueBPopupNotice(hoursError!, kind: QueueBFeedbackKind.error),
             ],
           ),
         );

@@ -1,6 +1,8 @@
 import {
   ConflictException,
   Injectable,
+  Optional,
+  HttpException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -13,6 +15,8 @@ import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { PasswordService } from './password.service';
+import { AuthAuditService, authAuditContext } from './audit/auth-audit.service';
+import type { AuthAuditContext, AuthAction } from './audit/auth-audit.service';
 
 @Injectable()
 export class AuthService {
@@ -22,6 +26,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
+    @Optional() private readonly auditService?: AuthAuditService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -49,10 +54,18 @@ export class AuthService {
     };
   }
 
-  async login(dto: LoginDto) {
+  login(dto: LoginDto, context = authAuditContext()) {
+    return this.audited('LOGIN', context, () =>
+      this.loginInternal(dto, context),
+    );
+  }
+
+  private async loginInternal(dto: LoginDto, context: AuthAuditContext) {
     const email = dto.email.trim().toLowerCase();
 
     const user = await this.usersService.findByEmail(email);
+
+    context.akunRef = user?.auditRef;
 
     if (!user || !user.aktif) {
       throw new UnauthorizedException('Email atau kata sandi tidak valid');
@@ -100,7 +113,7 @@ export class AuthService {
           throw new UnauthorizedException(
             'Kredensial berubah. Silakan masuk kembali',
           );
-        await tx.sesiPengguna.create({
+        const session = await tx.sesiPengguna.create({
           data: {
             id: sessionId,
             penggunaId: user.id,
@@ -109,6 +122,7 @@ export class AuthService {
             kedaluwarsaPada: this.getRefreshExpirationDate(),
           },
         });
+        context.sesiRef = session?.auditRef;
       },
       { timeout: 10000 },
     );
@@ -124,7 +138,16 @@ export class AuthService {
     };
   }
 
-  async refresh(dto: RefreshTokenDto) {
+  refresh(dto: RefreshTokenDto, context = authAuditContext()) {
+    return this.audited('REFRESH', context, () =>
+      this.refreshInternal(dto, context),
+    );
+  }
+
+  private async refreshInternal(
+    dto: RefreshTokenDto,
+    context: AuthAuditContext,
+  ) {
     const payload = await this.verifyRefreshToken(dto.refreshToken);
 
     const session = await this.prisma.sesiPengguna.findUnique({
@@ -134,6 +157,8 @@ export class AuthService {
     });
 
     const now = new Date();
+
+    if (session?.penggunaId === payload.sub) context.sesiRef = session.auditRef;
 
     if (
       !session ||
@@ -151,6 +176,8 @@ export class AuthService {
     }
 
     const user = await this.usersService.findById(payload.sub);
+
+    context.akunRef = user?.auditRef;
 
     if (!user || !user.aktif) {
       throw new UnauthorizedException('Pengguna tidak valid atau tidak aktif');
@@ -211,7 +238,16 @@ export class AuthService {
     };
   }
 
-  async logout(dto: RefreshTokenDto) {
+  logout(dto: RefreshTokenDto, context = authAuditContext()) {
+    return this.audited('LOGOUT', context, () =>
+      this.logoutInternal(dto, context),
+    );
+  }
+
+  private async logoutInternal(
+    dto: RefreshTokenDto,
+    context: AuthAuditContext,
+  ) {
     const payload = await this.verifyRefreshToken(dto.refreshToken);
 
     const session = await this.prisma.sesiPengguna.findUnique({
@@ -223,6 +259,8 @@ export class AuthService {
     if (!session || session.penggunaId !== payload.sub) {
       throw new UnauthorizedException('Sesi tidak valid');
     }
+
+    context.sesiRef = session.auditRef;
 
     const providedHash = this.hashRefreshToken(dto.refreshToken);
 
@@ -242,6 +280,39 @@ export class AuthService {
     return {
       message: 'Logout berhasil',
     };
+  }
+
+  private async audited<T>(
+    action: AuthAction,
+    context: AuthAuditContext,
+    run: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      const result = await run();
+      try {
+        await this.auditService?.record(action, context, 'BERHASIL', 'OK');
+      } catch {
+        /* Preserve committed auth even if the audit adapter fails. */
+      }
+      return result;
+    } catch (error) {
+      const denied = error instanceof HttpException && error.getStatus() < 500;
+      try {
+        await this.auditService?.record(
+          action,
+          context,
+          denied ? 'DITOLAK' : 'ERROR',
+          denied
+            ? action === 'LOGIN'
+              ? 'CREDENTIALS_REJECTED'
+              : 'SESSION_REJECTED'
+            : 'AUTH_ERROR',
+        );
+      } catch {
+        /* Preserve the original auth failure. */
+      }
+      throw error;
+    }
   }
 
   private async generateTokens(params: {

@@ -105,8 +105,14 @@ class StaffQueueBloc extends Bloc<StaffQueueEvent, StaffQueueState> {
     StaffOperation operation, {
     String? ticketId,
     String? qr,
+    String? alasan,
   }) {
-    final event = StaffCommand(operation, ticketId: ticketId, qr: qr);
+    final event = StaffCommand(
+      operation,
+      ticketId: ticketId,
+      qr: qr,
+      alasan: alasan,
+    );
     // Observe even if a caller abandons a dialog while the HTTP request finishes.
     unawaited(
       event.completion.future.then<void>(
@@ -366,6 +372,10 @@ class StaffQueueBloc extends Bloc<StaffQueueEvent, StaffQueueState> {
       StaffOperation.skip ||
       StaffOperation.start => active?['status'] == 'DIPANGGIL',
       StaffOperation.complete => active?['status'] == 'DILAYANI',
+      StaffOperation.cancelEnded =>
+        row?['status'] == 'MENUNGGU' &&
+            row?['bisaBatalkanSesiBerakhir'] == true &&
+            staffEndedSessionReasons.containsKey(event.alasan),
       StaffOperation.requeue =>
         row?['status'] == 'DILEWATI' && row?['bisaAntreUlang'] == true,
       StaffOperation.enqueue =>
@@ -432,6 +442,7 @@ class StaffQueueBloc extends Bloc<StaffQueueEvent, StaffQueueState> {
           room,
           ticketId: event.ticketId,
           qr: qr,
+          alasan: event.alasan,
         );
       } catch (error) {
         failure = staffError(error);

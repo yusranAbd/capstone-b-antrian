@@ -1,10 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'config.dart';
 import 'mobile_ui.dart';
+import 'portal_header.dart';
 import 'doctor_professional.dart';
 import 'staff_ui.dart';
-import 'queueb_motion.dart';
 import 'queueb_value_motion.dart';
 
 class StaffToolbar extends StatelessWidget implements PreferredSizeWidget {
@@ -15,90 +17,220 @@ class StaffToolbar extends StatelessWidget implements PreferredSizeWidget {
     required this.name,
     required this.onProfile,
   });
+
+  // The room picker remains in the dashboard content.
   final Widget selection, avatar;
   final String name;
   final VoidCallback onProfile;
+
   @override
-  Size get preferredSize => const Size.fromHeight(56);
+  Size get preferredSize =>
+      const Size.fromHeight(QueueBPortalHeader.toolbarHeight);
+
+  @override
+  Widget build(BuildContext context) => QueueBPortalHeader(
+    portalTitle: 'Portal Petugas',
+    portalIcon: Icons.people_outline_rounded,
+    roleLabel: 'Petugas Pelayanan',
+    avatar: avatar,
+    name: name,
+    onProfile: onProfile,
+  );
+}
+
+class StaffDashboardClock extends StatefulWidget {
+  const StaffDashboardClock({super.key, required this.config});
+  final AppConfig config;
+  @override
+  State<StaffDashboardClock> createState() => _StaffDashboardClockState();
+}
+
+class _StaffDashboardClockState extends State<StaffDashboardClock> {
+  late final Timer timer;
+  @override
+  void initState() {
+    super.initState();
+    timer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    timer.cancel();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final wide = MediaQuery.sizeOf(context).width >= 900;
-    return AppBar(
-      toolbarHeight: preferredSize.height,
-      titleSpacing: wide ? 20 : 10,
-      title: Row(
+    final now = widget.config.now;
+    const days = [
+      'Senin',
+      'Selasa',
+      'Rabu',
+      'Kamis',
+      'Jumat',
+      'Sabtu',
+      'Minggu',
+    ];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Agu',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Des',
+    ];
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xfff7f9ff),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: QueueBStyle.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          if (wide)
-            const SizedBox(width: 205, child: QueueBBrand(compact: true))
-          else
-            const Tooltip(
-              message: 'QueueB Hospital',
-              child: Icon(
-                Icons.local_hospital_rounded,
-                color: QueueBStyle.darkTeal,
-                size: 28,
-              ),
-            ),
-          SizedBox(width: wide ? 16 : 8),
-          Expanded(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 430),
-                child: selection,
-              ),
+          const Icon(
+            Icons.calendar_today_outlined,
+            color: StaffStyle.ink,
+            size: 22,
+          ),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${days[now.weekday - 1]}, ${two(now.day)} ${months[now.month - 1]} ${now.year}',
+                  style: const TextStyle(
+                    color: StaffStyle.ink,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  'Pukul ${two(now.hour)}.${two(now.minute)} · ${widget.config.serviceTimeZone}',
+                  style: const TextStyle(
+                    color: QueueBStyle.muted,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       ),
-      actions: [
-        Tooltip(
-          message: 'Profil petugas',
-          child: TextButton(
-            onPressed: onProfile,
-            style: TextButton.styleFrom(
-              foregroundColor: QueueBStyle.navy,
-              padding: EdgeInsets.symmetric(horizontal: wide ? 12 : 8),
-              minimumSize: const Size(44, 44),
-            ),
+    );
+  }
+}
+
+class StaffScheduledDoctorSummary extends StatelessWidget {
+  const StaffScheduledDoctorSummary({
+    super.key,
+    required this.config,
+    required this.schedules,
+    required this.onOpen,
+    this.loading = false,
+    this.failed = false,
+  });
+  final AppConfig config;
+  final List<Json> schedules;
+  final VoidCallback onOpen;
+  final bool loading, failed;
+
+  @override
+  Widget build(BuildContext context) {
+    final first = schedules.firstOrNull;
+    final doctor = object(object(first?['dokterLayanan'])['dokter']);
+    final names = schedules
+        .map((s) => label(object(object(s['dokterLayanan'])['dokter'])))
+        .toSet()
+        .toList();
+    final time = first == null
+        ? ''
+        : '${config.instantLabel(first['mulaiPada']).split(' ').last}–${config.instantLabel(first['selesaiPada']).split(' ').last}';
+    return Tooltip(
+      message: schedules.isEmpty
+          ? 'Jadwal dokter untuk ruangan dan tanggal pelayanan ini'
+          : names.join('\n'),
+      child: Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: QueueBStyle.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: schedules.isEmpty ? null : onOpen,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                avatar,
-                if (wide) ...[
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: 142,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const Text(
-                          'Petugas pelayanan',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: QueueBStyle.muted,
-                          ),
-                        ),
-                      ],
-                    ),
+                if (first == null)
+                  const Icon(
+                    Icons.medical_services_outlined,
+                    size: 25,
+                    color: StaffStyle.blue,
+                  )
+                else
+                  ProfessionalDoctorAvatar(
+                    config: config,
+                    photo: doctor['fotoProfil'],
+                    radius: 16,
                   ),
-                ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Dokter terjadwal${time.isEmpty ? '' : ' · $time'}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: QueueBStyle.muted,
+                        ),
+                      ),
+                      Text(
+                        loading && first == null
+                            ? 'Memuat jadwal…'
+                            : failed && first == null
+                            ? 'Jadwal belum tersedia'
+                            : first == null
+                            ? 'Tidak ada jadwal'
+                            : '${label(doctor)}${names.length > 1 ? ' +${names.length - 1}' : ''}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: StaffStyle.ink,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (schedules.isNotEmpty)
+                  const Icon(
+                    Icons.expand_more_rounded,
+                    size: 20,
+                    color: QueueBStyle.muted,
+                  ),
               ],
             ),
           ),
         ),
-        SizedBox(width: wide ? 8 : 2),
-      ],
+      ),
     );
   }
 }
@@ -280,10 +412,13 @@ class StaffPatientList extends StatefulWidget {
     required this.config,
     required this.busy,
     required this.onAction,
+    this.serviceName = '—',
+    this.compact = false,
   });
   final List<Json> rows;
   final AppConfig config;
-  final bool busy;
+  final bool busy, compact;
+  final String serviceName;
   final void Function(Json row, String action) onAction;
   @override
   State<StaffPatientList> createState() => _StaffPatientListState();
@@ -291,60 +426,42 @@ class StaffPatientList extends StatefulWidget {
 
 class _StaffPatientListState extends State<StaffPatientList> {
   int page = 0;
-  static const size = 5;
+  static const maxPageSize = 5;
+  int renderedPageSize = maxPageSize;
   @override
   Widget build(BuildContext context) {
-    final total = widget.rows.length;
-    final last = total == 0 ? 0 : (total - 1) ~/ size;
-    if (page > last) page = last;
-    final start = page * size;
-    final shown = widget.rows.skip(start).take(size).toList();
     return LayoutBuilder(
       builder: (context, box) {
-        final table = box.maxWidth >= 630;
+        final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+        final table = box.maxWidth >= 480 && scale <= 1.35;
+        final showService = box.maxWidth >= 620;
+        final footerHeight = 52 * scale;
+        final headerHeight = table ? 30 * scale : 0;
+        final rowHeight = (table ? 60 : 150) * scale;
+        final size = widget.compact && box.hasBoundedHeight
+            ? ((box.maxHeight - footerHeight - headerHeight) / rowHeight)
+                  .floor()
+                  .clamp(1, maxPageSize)
+                  .toInt()
+            : maxPageSize;
+        if (renderedPageSize != size) {
+          page = (page * renderedPageSize) ~/ size;
+          renderedPageSize = size;
+        }
+        final total = widget.rows.length;
+        final last = total == 0 ? 0 : (total - 1) ~/ size;
+        if (page > last) page = last;
+        final start = page * size;
+        final shown = widget.rows.skip(start).take(size).toList();
         Widget cell(Widget child, int flex) => Expanded(
           flex: flex,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
+            padding: EdgeInsets.symmetric(horizontal: widget.compact ? 6 : 8),
             child: child,
           ),
         );
-        Widget status(Json t) {
-          final state = t['status'];
-          final waiting = state == 'MENUNGGU';
-          return Align(
-            alignment: Alignment.centerLeft,
-            child: AnimatedContainer(
-              duration: QueueBMotion.duration(context, QueueBMotion.micro),
-              curve: QueueBMotion.entering,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              decoration: BoxDecoration(
-                color: waiting
-                    ? const Color(0xfffff2d3)
-                    : state == 'CHECK_IN'
-                    ? const Color(0xffe5f2ff)
-                    : const Color(0xffedf1f7),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                waiting
-                    ? 'Menunggu'
-                    : state == 'CHECK_IN'
-                    ? 'Check-in'
-                    : 'Dilewati',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: waiting ? QueueBStyle.warning : QueueBStyle.navy,
-                ),
-              ),
-            ),
-          );
-        }
-
         Widget menu(Json t) => SizedBox(
           width: 36,
-          height: table ? 32 : 44,
           child: PopupMenuButton<String>(
             padding: EdgeInsets.zero,
             tooltip: 'Aksi ${t['nomorAntrean']}',
@@ -352,6 +469,12 @@ class _StaffPatientListState extends State<StaffPatientList> {
             onSelected: (a) => widget.onAction(t, a),
             itemBuilder: (_) => [
               const PopupMenuItem(value: 'detail', child: Text('Detail tiket')),
+              if (t['status'] == 'MENUNGGU' &&
+                  t['bisaBatalkanSesiBerakhir'] == true)
+                const PopupMenuItem(
+                  value: 'batalkan-sesi-berakhir',
+                  child: Text('Batalkan setelah sesi berakhir'),
+                ),
               if (t['status'] == 'DILEWATI' && t['bisaAntreUlang'] == true)
                 const PopupMenuItem(
                   value: 'antre-ulang',
@@ -363,55 +486,159 @@ class _StaffPatientListState extends State<StaffPatientList> {
                   child: Text('Masuk Antrean'),
                 ),
             ],
-            icon: const Icon(Icons.more_horiz, size: 22),
-          ),
-        );
-        Widget number(Json t) => Text(
-          '${t['nomorAntrean']}',
-          style: const TextStyle(
-            color: QueueBStyle.darkTeal,
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
-          ),
-        );
-        Widget name(Json t) => Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${t['namaPasien'] ?? 'Nama belum tersedia'}',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+            icon: const Icon(
+              Icons.more_horiz_rounded,
+              size: 22,
+              color: QueueBStyle.muted,
             ),
-            if (t['layakDipanggil'] == false)
-              Text(
-                '${t['alasanTidakLayak'] ?? 'Belum layak dipanggil'}'
-                    .replaceAll('_', ' '),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: QueueBStyle.warning,
-                ),
+          ),
+        );
+        Widget number(Json t) => Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: widget.compact ? 8 : 10,
+            vertical: widget.compact ? 5 : 7,
+          ),
+          decoration: BoxDecoration(
+            color: StaffStyle.soft,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            '${t['nomorAntrean'] ?? '—'}',
+            style: TextStyle(
+              color: StaffStyle.ink,
+              fontSize: widget.compact ? 15 : 17,
+              height: 1.1,
+              fontWeight: FontWeight.w800,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        );
+        Widget name(Json t) => Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(widget.compact ? 5 : 7),
+              decoration: BoxDecoration(
+                color: StaffStyle.soft,
+                borderRadius: BorderRadius.circular(13),
               ),
+              child: const Icon(
+                Icons.person_rounded,
+                size: 22,
+                color: Color(0xff6074e8),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${t['namaPasien'] ?? 'Nama belum tersedia'}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: StaffStyle.ink,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (table && !showService)
+                    Text(
+                      widget.serviceName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: QueueBStyle.muted,
+                      ),
+                    ),
+                  if (t['layakDipanggil'] == false)
+                    Text(
+                      '${t['alasanTidakLayak'] ?? 'Belum layak dipanggil'}'
+                          .replaceAll('_', ' '),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: QueueBStyle.warning,
+                      ),
+                    )
+                  else if (t['checkInPada'] != null)
+                    Text(
+                      'Check-in ${widget.config.instantLabel(t['checkInPada']).split(' ').last}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: QueueBStyle.muted,
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ],
+        );
+        Widget service() => Row(
+          children: [
+            const Icon(
+              Icons.medical_services_outlined,
+              size: 17,
+              color: QueueBStyle.muted,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                widget.serviceName,
+                style: const TextStyle(fontSize: 13),
+              ),
+            ),
+          ],
+        );
+        Widget pageButton(int index) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 3),
+          child: SizedBox(
+            width: 36,
+            child: index == page
+                ? FilledButton(
+                    style: FilledButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      backgroundColor: StaffStyle.blue,
+                    ),
+                    onPressed: () {},
+                    child: Text('${index + 1}'),
+                  )
+                : OutlinedButton(
+                    style: OutlinedButton.styleFrom(padding: EdgeInsets.zero),
+                    onPressed: () => setState(() => page = index),
+                    child: Text('${index + 1}'),
+                  ),
+          ),
         );
         final content = Column(
           children: [
             if (table)
               Container(
-                height: 30,
-                color: QueueBStyle.background,
-                child: Row(
-                  children: [
-                    cell(const Text('#'), 5),
-                    cell(const Text('No. Antrean'), 17),
-                    cell(const Text('Nama Pasien'), 29),
-                    cell(const Text('Status'), 19),
-                    cell(const Text('Waktu Check-in'), 23),
-                    cell(const Text('Aksi'), 7),
-                  ],
+                padding: EdgeInsets.symmetric(
+                  vertical: widget.compact ? 7 : 12,
+                  horizontal: 4,
+                ),
+                margin: const EdgeInsets.only(bottom: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xfff5f6fc),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: DefaultTextStyle(
+                  style: const TextStyle(
+                    color: QueueBStyle.muted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  child: Row(
+                    children: [
+                      cell(const Text('No. Antrean'), 19),
+                      cell(const Text('Nama Pasien'), 36),
+                      if (showService) cell(const Text('Jenis Layanan'), 25),
+                      cell(const Text('Status'), 23),
+                      const SizedBox(width: 36),
+                    ],
+                  ),
                 ),
               ),
             Expanded(
@@ -419,107 +646,137 @@ class _StaffPatientListState extends State<StaffPatientList> {
                   ? const StaffEmpty('Belum ada antrean yang sesuai.')
                   : ListView.separated(
                       primary: false,
+                      padding: EdgeInsets.zero,
                       itemCount: shown.length,
-                      separatorBuilder: (_, i) =>
-                          const Divider(height: 1, color: QueueBStyle.border),
+                      separatorBuilder: (_, i) => const SizedBox(height: 4),
                       itemBuilder: (context, i) {
                         final t = shown[i];
-                        final time = widget.config.instantLabel(
-                          t['checkInPada'],
-                        );
+                        final id = t['tiketId'] ?? t['id'];
                         return QueueBValueMotion(
-                          key: ValueKey(t['id']),
-                          scope: t['id'],
+                          key: ValueKey(id),
+                          scope: id,
                           value: t['status'],
                           animateChild: false,
                           highlight: true,
                           highlightColor: QueueBStyle.teal,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              vertical: widget.compact ? 6 : 10,
+                              horizontal: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: QueueBStyle.border.withValues(
+                                  alpha: .75,
+                                ),
+                              ),
+                            ),
                             child: table
                                 ? Row(
                                     children: [
-                                      cell(Text('${start + i + 1}'), 5),
-                                      cell(number(t), 17),
-                                      cell(name(t), 29),
-                                      cell(status(t), 19),
-                                      cell(
-                                        Text(
-                                          time,
-                                          style: const TextStyle(
-                                            fontSize: 11,
-                                            color: QueueBStyle.muted,
-                                          ),
-                                        ),
-                                        23,
-                                      ),
-                                      cell(menu(t), 7),
+                                      cell(number(t), 19),
+                                      cell(name(t), 36),
+                                      if (showService) cell(service(), 25),
+                                      cell(StaffStatusPill(t['status']), 23),
+                                      menu(t),
                                     ],
                                   )
-                                : Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          number(t),
-                                          const SizedBox(width: 10),
-                                          Expanded(child: status(t)),
-                                          menu(t),
-                                        ],
-                                      ),
-                                      name(t),
-                                      Text(
-                                        'Check-in: $time',
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          color: QueueBStyle.muted,
+                                : Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            number(t),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Align(
+                                                alignment: Alignment.centerLeft,
+                                                child: StaffStatusPill(
+                                                  t['status'],
+                                                ),
+                                              ),
+                                            ),
+                                            menu(t),
+                                          ],
                                         ),
-                                      ),
-                                    ],
+                                        const SizedBox(height: 8),
+                                        name(t),
+                                        const SizedBox(height: 8),
+                                        service(),
+                                      ],
+                                    ),
                                   ),
                           ),
                         );
                       },
                     ),
             ),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '$total tiket · halaman ${page + 1}/${last + 1}',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: QueueBStyle.muted,
+            const SizedBox(height: 10),
+            LayoutBuilder(
+              builder: (context, footer) {
+                final caption = Text(
+                  total == 0
+                      ? 'Menampilkan 0 antrean'
+                      : 'Menampilkan ${start + 1}–${start + shown.length} dari $total antrean',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: QueueBStyle.muted,
+                  ),
+                );
+                final pagination = Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Halaman antrean sebelumnya',
+                      onPressed: page > 0 ? () => setState(() => page--) : null,
+                      icon: const Icon(Icons.chevron_left_rounded),
                     ),
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Halaman antrean sebelumnya',
-                  constraints: const BoxConstraints.tightFor(
-                    width: 36,
-                    height: 36,
-                  ),
-                  padding: EdgeInsets.zero,
-                  onPressed: page > 0 ? () => setState(() => page--) : null,
-                  icon: const Icon(Icons.chevron_left),
-                ),
-                IconButton(
-                  tooltip: 'Halaman antrean berikutnya',
-                  constraints: const BoxConstraints.tightFor(
-                    width: 36,
-                    height: 36,
-                  ),
-                  padding: EdgeInsets.zero,
-                  onPressed: page < last ? () => setState(() => page++) : null,
-                  icon: const Icon(Icons.chevron_right),
-                ),
-              ],
+                    for (
+                      var index = (page - 1).clamp(0, last).toInt();
+                      index <= (page + 1).clamp(0, last).toInt();
+                      index++
+                    )
+                      pageButton(index),
+                    IconButton(
+                      tooltip: 'Halaman antrean berikutnya',
+                      onPressed: page < last
+                          ? () => setState(() => page++)
+                          : null,
+                      icon: const Icon(Icons.chevron_right_rounded),
+                    ),
+                  ],
+                );
+                return footer.maxWidth < 500 ||
+                        MediaQuery.textScalerOf(context).scale(12) > 16
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          caption,
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: pagination,
+                          ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Expanded(child: caption),
+                          pagination,
+                        ],
+                      );
+              },
             ),
           ],
         );
         final minimum = MediaQuery.textScalerOf(context)
-            .scale(table ? 140 : 160);
+            .scale(table ? 145 : 230);
         return box.hasBoundedHeight && box.maxHeight < minimum
             ? SingleChildScrollView(
                 child: SizedBox(height: minimum, child: content),

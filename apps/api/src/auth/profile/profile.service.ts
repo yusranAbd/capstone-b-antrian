@@ -3,11 +3,13 @@ import {
   ConflictException,
   Injectable,
   Logger,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PasswordService } from '../password.service';
 import { ChangeOwnPasswordDto, UpdateOwnProfileDto } from './profile.dto';
+import { AuthAuditService } from '../audit/auth-audit.service';
 
 export const OWN_PROFILE_SELECT = {
   id: true,
@@ -25,6 +27,7 @@ export class ProfileService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly passwords: PasswordService,
+    @Optional() private readonly sessionAudit?: AuthAuditService,
   ) {}
 
   async read(id: string) {
@@ -59,7 +62,7 @@ export class ProfileService {
     if (await this.passwords.verify(dto.kataSandiBaru, observed.kataSandiHash))
       throw new BadRequestException('Kata sandi baru harus berbeda');
     const hash = await this.passwords.hash(dto.kataSandiBaru);
-    await this.prisma.$transaction(
+    const revoked = await this.prisma.$transaction(
       async (tx) => {
         await tx.$executeRaw`SET LOCAL lock_timeout = '5s'`;
         await tx.$queryRaw`SELECT id FROM pengguna WHERE id = ${id}::uuid FOR UPDATE`;
@@ -71,14 +74,25 @@ export class ProfileService {
           throw new ConflictException(
             'Keamanan akun sedang berubah. Muat ulang dan coba kembali',
           );
-        await tx.sesiPengguna.updateMany({
+        const sessions = await tx.sesiPengguna.updateMany({
           where: { penggunaId: id, dicabutPada: null },
           data: { dicabutPada: new Date() },
         });
+        return sessions?.count ?? null;
       },
       { timeout: 10000 },
     );
     this.audit('UBAH_KATA_SANDI_CABUT_SESI', id);
+    try {
+      await this.sessionAudit?.recordRevocation(
+        id,
+        id,
+        'PASSWORD_CHANGED',
+        revoked,
+      );
+    } catch {
+      /* Revocation is already committed. */
+    }
     return {
       message: 'Kata sandi berhasil diubah. Silakan masuk kembali.',
       loginUlang: true,

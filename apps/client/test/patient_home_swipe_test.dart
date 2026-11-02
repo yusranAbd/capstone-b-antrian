@@ -86,7 +86,7 @@ void main() {
         1,
         reason: 'Dragging clinic chips must not change service tab',
       );
-      await t.tap(find.widgetWithText(NavigationDestination, 'Riwayat'));
+      await t.tap(find.widgetWithText(NavigationDestination, 'Reservasi'));
       await t.pumpAndSettle();
       await t.tap(find.widgetWithText(NavigationDestination, 'Beranda'));
       await t.pumpAndSettle();

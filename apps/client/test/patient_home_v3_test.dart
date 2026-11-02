@@ -12,6 +12,7 @@ import 'package:queueb_client/src/config.dart';
 import 'package:queueb_client/src/patient_home.dart';
 import 'package:queueb_client/src/patient_home_v6.dart';
 import 'package:queueb_client/src/patient_home_v8.dart';
+import 'package:queueb_client/src/patient_ui.dart';
 import 'package:queueb_client/src/doctor_professional.dart';
 
 import 'patient_v2_test.dart' show PatientV2Backend;
@@ -209,7 +210,10 @@ void main() {
       expect(find.byTooltip('Notifikasi'), findsOneWidget);
       expect(find.byTooltip('Profil pasien'), findsOneWidget);
       if (find.byType(PatientHomeService).evaluate().isEmpty) {
-        await tester.drag(find.byType(PatientHomeTabs), const Offset(0, -240));
+        await tester.drag(
+          find.byType(PatientNativeHomeTabs),
+          const Offset(0, -240),
+        );
         await tester.pumpAndSettle();
       }
       expect(find.byType(PatientHomeService), findsWidgets);
@@ -234,7 +238,12 @@ void main() {
             .session?['id'],
         'session-home',
       );
-      for (final destination in ['Riwayat', 'Informasi', 'Profil', 'Beranda']) {
+      for (final destination in [
+        'Reservasi',
+        'Informasi',
+        'Profil',
+        'Beranda',
+      ]) {
         await press(
           tester,
           find.widgetWithText(NavigationDestination, destination),
@@ -281,7 +290,7 @@ void main() {
       expect(find.text('Anak \u00b7 Poli Umum'), findsOneWidget);
       await press(tester, find.byType(PatientHomeDoctorV6));
       expect(find.text('Detail Dokter'), findsOneWidget);
-      expect(find.text('Buat Janji Temu'), findsOneWidget);
+      expect(find.text('Lanjutkan Reservasi'), findsOneWidget);
       expect(b.requests.where((r) => r.$1 != 'GET'), isEmpty);
     },
   );
@@ -317,7 +326,7 @@ void main() {
         );
         expect(
           tester.getBottomLeft(card).dy,
-          lessThan(tester.getTopLeft(find.byType(PatientHomeModes)).dy),
+          lessThan(tester.getTopLeft(find.byType(TabBar)).dy),
         );
         expect(find.byType(PatientHomeBanner), findsNothing);
         await press(tester, find.text('Lihat Detail'));
@@ -329,7 +338,7 @@ void main() {
           b.requests.where((r) => r.$1 == 'POST').single.$2,
           '/tiket/$uid/qr',
         );
-        expect(find.text('Tiket UM-001'), findsOneWidget);
+        expect(find.text('Detail Tiket'), findsOneWidget);
         expect(tester.takeException(), isNull);
       },
     );
@@ -382,7 +391,7 @@ void main() {
       expect(b.requests.where((r) => r.$1 == 'POST'), isEmpty);
       if (condition == 'future') {
         expect(
-          find.textContaining('tanggal pelayanan (${b.tomorrow})'),
+          find.text('Kode QR diterbitkan pada ${patientDate(b.tomorrow)}'),
           findsOneWidget,
         );
       }

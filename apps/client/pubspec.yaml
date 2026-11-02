@@ -37,6 +37,8 @@ dependencies:
   socket_io_client: ^3.1.6
   timezone: ^0.11.2
   qr_flutter: ^4.1.0
+  pdf: ^3.13.1
+  printing: ^5.15.1
   mobile_scanner: ^7.4.2
   flutter_tts: ^4.2.5
   flutter_localizations:
@@ -77,6 +79,7 @@ flutter:
     - assets/illustrations/doctor_avatar.png
     - assets/illustrations/patient_ticket.webp
     - assets/illustrations/patient_hospital.png
+    - assets/illustrations/staff_stethoscope_banner.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

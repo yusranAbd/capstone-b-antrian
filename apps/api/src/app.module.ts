@@ -22,6 +22,8 @@ import { RealtimeModule } from './realtime/realtime.module';
 import { DokterModule } from './dokter/dokter.module';
 import { JadwalPraktikModule } from './jadwal-praktik/jadwal-praktik.module';
 import { SlotPraktikModule } from './slot-praktik/slot-praktik.module';
+import { NotifikasiModule } from './notifikasi/notifikasi.module';
+import { LaporanModule } from './laporan/laporan.module';
 
 @Module({
   imports: [
@@ -57,6 +59,8 @@ import { SlotPraktikModule } from './slot-praktik/slot-praktik.module';
     CheckInModule,
     QueueModule,
     RealtimeModule,
+    NotifikasiModule,
+    LaporanModule,
   ],
 })
 export class AppModule {}

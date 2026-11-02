@@ -13,6 +13,11 @@ const identitas = {
   loketId: true,
   checkInPada: true,
   pengguna: { select: { nama: true } },
+  janjiTemu: {
+    select: {
+      slotPraktik: { select: { jadwalPraktik: { select: { loketId: true } } } },
+    },
+  },
 } as const;
 
 export async function bacaPasienOperasional(
@@ -26,7 +31,11 @@ export async function bacaPasienOperasional(
   prefix: string,
   halaman = 1,
 ) {
-  if (!Number.isSafeInteger(halaman) || halaman < 1 || (halaman - 1) * 100 > 2_147_483_647)
+  if (
+    !Number.isSafeInteger(halaman) ||
+    halaman < 1 ||
+    (halaman - 1) * 100 > 2_147_483_647
+  )
     throw new BadRequestException('halamanTindakLanjut minimal 1');
   const scope = { layananId, tanggalAntrean: tanggal };
   const tindakLanjut: Prisma.TiketAntreanWhereInput = {
@@ -69,7 +78,15 @@ export async function bacaPasienOperasional(
   });
   const tiket: SnapshotPasien[] = [
     // Keep the exact queue selector order. The following groups are display-only.
-    ...menunggu.map((t) => ({ ...t, ...data(nama.get(t.tiketId)) })),
+    ...menunggu.map((t) => ({
+      ...t,
+      ...data(nama.get(t.tiketId)),
+      bisaBatalkanSesiBerakhir:
+        t.jenisAntrean === 'JANJI_TEMU' &&
+        t.alasanTidakLayak === 'SESI_BERAKHIR' &&
+        nama.get(t.tiketId)?.janjiTemu?.slotPraktik.jadwalPraktik.loketId ===
+          loketId,
+    })),
     ...lanjutan.map((t) => ({
       tiketId: t.id,
       nomorAntrean: `${prefix.trim()}-${String(t.nomorUrut).padStart(3, '0')}`,

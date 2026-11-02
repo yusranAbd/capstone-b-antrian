@@ -207,7 +207,7 @@ void main() {
       await t.enterText(find.byType(TextField).first, 'Sindi');
       await t.pumpAndSettle();
       expect(find.byType(PatientHomeDoctorV6), findsOneWidget);
-      await t.tap(find.widgetWithText(NavigationDestination, 'Riwayat'));
+      await t.tap(find.widgetWithText(NavigationDestination, 'Reservasi'));
       await t.pumpAndSettle();
       await t.tap(find.widgetWithText(NavigationDestination, 'Beranda'));
       await t.pumpAndSettle();
@@ -249,14 +249,8 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.byType(PatientHomeDoctorV6));
       await t.pumpAndSettle();
-      expect(
-        t
-            .widget<FilledButton>(
-              find.widgetWithText(FilledButton, 'Buat Janji Temu'),
-            )
-            .onPressed,
-        isNull,
-      );
+      expect(find.text('Lanjutkan Reservasi'), findsNothing);
+      expect(find.text('Daftar antrean poliklinik'), findsOneWidget);
       final action = find.text('Daftar antrean poliklinik');
       await t.ensureVisible(action);
       await t.pumpAndSettle();

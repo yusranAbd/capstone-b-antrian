@@ -171,7 +171,7 @@ class _AdminStaffAccountsState extends State<AdminStaffAccounts> {
           ],
         ),
         if (operationError != null) Notice(operationError, error: true),
-        if (message != null) Notice(message!),
+        if (message != null) Notice(message!, success: true),
         if (saving) const LinearProgressIndicator(),
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),

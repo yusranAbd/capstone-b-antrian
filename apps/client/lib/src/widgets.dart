@@ -2,31 +2,47 @@ import 'package:flutter/material.dart';
 
 import 'config.dart';
 import 'mobile_ui.dart';
+import 'queueb_feedback.dart';
 
 class Notice extends StatelessWidget {
-  const Notice(this.text, {super.key, this.error = false});
+  const Notice(
+    this.text, {
+    super.key,
+    this.error = false,
+    this.success = false,
+    this.popup = false,
+  });
   final String text;
-  final bool error;
+  final bool error, success, popup;
   @override
-  Widget build(BuildContext context) => Container(
-    width: double.infinity,
-    margin: const EdgeInsets.symmetric(vertical: 8),
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: error
-          ? Theme.of(context).colorScheme.errorContainer
-          : const Color(0xffeaf0ff),
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: SelectableText(
-      text,
-      style: TextStyle(
-        color: error
-            ? Theme.of(context).colorScheme.onErrorContainer
-            : const Color(0xff20375c),
-      ),
-    ),
-  );
+  Widget build(BuildContext context) => error || success || popup
+      ? QueueBPopupNotice(
+          text,
+          kind: error
+              ? QueueBFeedbackKind.error
+              : success
+              ? QueueBFeedbackKind.success
+              : QueueBFeedbackKind.info,
+        )
+      : Container(
+          width: double.infinity,
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: error
+                ? Theme.of(context).colorScheme.errorContainer
+                : const Color(0xffeaf0ff),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: SelectableText(
+            text,
+            style: TextStyle(
+              color: error
+                  ? Theme.of(context).colorScheme.onErrorContainer
+                  : const Color(0xff20375c),
+            ),
+          ),
+        );
 }
 
 class Section extends StatelessWidget {

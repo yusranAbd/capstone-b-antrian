@@ -7,6 +7,8 @@ import 'features/admin/data/admin_catalog_repository.dart';
 import 'features/admin/data/admin_slot_repository.dart';
 
 import 'admin_schema.dart';
+import 'admin_service_readiness.dart';
+import 'service_category.dart';
 import 'admin_practice_agenda.dart';
 import 'admin_schedules.dart';
 import 'admin_ui.dart';
@@ -109,19 +111,45 @@ class AdminDataGroup extends StatefulWidget {
 class _AdminDataGroupState extends State<AdminDataGroup> {
   bool expanded = false;
   @override
-  Widget build(BuildContext context) => Card(
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 6),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      border: Border.all(color: QueueBStyle.border),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    clipBehavior: Clip.antiAlias,
     child: ExpansionTile(
       dense: true,
       visualDensity: VisualDensity.compact,
       tilePadding: const EdgeInsets.symmetric(horizontal: 12),
-      title: Text(
-        widget.title,
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+      childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+      shape: const Border(),
+      collapsedShape: const Border(),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              widget.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            widget.subtitle,
+            style: const TextStyle(fontSize: 11, color: QueueBStyle.muted),
+          ),
+        ],
       ),
-      subtitle: Text(widget.subtitle, style: const TextStyle(fontSize: 12)),
+      trailing: Icon(
+        expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+        size: 20,
+        color: QueueBStyle.muted,
+      ),
       expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
       onExpansionChanged: (value) => setState(() => expanded = value),
-      childrenPadding: const EdgeInsets.symmetric(horizontal: 12),
       children: expanded ? widget.children() : const [],
     ),
   );
@@ -228,6 +256,7 @@ class _AdminDataViewState extends State<AdminDataView> {
             ? 'Aksi profil dokter'
             : 'Aksi ${label(row)}',
         busy: widget.busy,
+        iconOnly: path == '/dokter',
         actions: [
           AdminRowAction(
             path == '/dokter' ? 'Ubah profil' : 'Ubah',
@@ -282,8 +311,33 @@ class _AdminDataViewState extends State<AdminDataView> {
     key: ValueKey('$path:$search:$status:$clinic:$doctor'),
     rows: items,
     compact: true,
-    rowHeight: path == '/dokter' ? 64 : null,
-    pageSize: path == '/dokter' ? 6 : 10,
+    rowHeight: path == '/dokter'
+        ? 58
+        : path == '/loket'
+        ? 44
+        : null,
+    pageSize:
+        const {
+          '/dokter',
+          '/layanan',
+          '/loket',
+          '/penugasan-petugas',
+        }.contains(path)
+        ? 5
+        : 10,
+    numberedPagination: const {
+      '/dokter',
+      '/layanan',
+      '/loket',
+      '/penugasan-petugas',
+    }.contains(path),
+    hideFooterWhenSinglePage: path == '/loket',
+    paginationLabel: switch (path) {
+      '/dokter' => 'dokter',
+      '/layanan' => 'poliklinik',
+      '/penugasan-petugas' => 'penugasan',
+      _ => 'data',
+    },
     columns: [
       if (path == '/jadwal-praktik') ...[
         AdminColumn('Tanggal', (r) => dateOnly(r['tanggal'])),
@@ -366,29 +420,57 @@ class _AdminDataViewState extends State<AdminDataView> {
                   .where((l) => l['aktif'] == true)
                   .map((l) => label(object(l['layanan'])))
                   .join(', '),
-          cell: (r) => SizedBox(
-            width: 150,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  rows(r['dokterLayanan'])
-                          .where((l) => l['aktif'] == true)
-                          .map((l) => label(object(l['layanan'])))
-                          .join(', ')
-                          .isEmpty
-                      ? 'Belum terhubung'
-                      : rows(r['dokterLayanan'])
-                            .where((l) => l['aktif'] == true)
-                            .map((l) => label(object(l['layanan'])))
-                            .join(', '),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+          cell: (r) {
+            final clinics = rows(r['dokterLayanan'])
+                .where((l) => l['aktif'] == true)
+                .map((l) => label(object(l['layanan'])))
+                .where((name) => name.trim().isNotEmpty)
+                .toList();
+            if (clinics.isEmpty) {
+              return const Text(
+                'Belum terhubung',
+                style: TextStyle(fontSize: 12, color: QueueBStyle.muted),
+              );
+            }
+
+            Widget clinicChip(String name) => Container(
+              constraints: const BoxConstraints(maxWidth: 165),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary
+                    .withValues(alpha: .09),
+                borderRadius: BorderRadius.circular(7),
+              ),
+              child: Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+
+            return Tooltip(
+              message: clinics.join(', '),
+              child: SizedBox(
+                width: 175,
+                child: Wrap(
+                  spacing: 4,
+                  runSpacing: 3,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    for (final name in clinics.take(clinics.length > 2 ? 1 : 2))
+                      clinicChip(name),
+                    if (clinics.length > 2)
+                      clinicChip('+${clinics.length - 1} lainnya'),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
         AdminColumn(
           'Akun login',
@@ -430,6 +512,16 @@ class _AdminDataViewState extends State<AdminDataView> {
         AdminColumn('Nama', label),
         AdminColumn('Kode', (r) => r['kode']),
         if (path == '/layanan') ...[
+          AdminColumn('Kategori', serviceCategoryLabel),
+          AdminColumn(
+            'Kelengkapan',
+            (_) => '',
+            cell: (r) => AdminServiceReadiness(
+              catalog: widget.catalog,
+              serviceId: r['id'],
+              today: widget.api.config.today,
+            ),
+          ),
           AdminColumn(
             'Mode reservasi',
             (r) => switch (r['modeReservasi']) {
@@ -560,81 +652,90 @@ class _AdminDataViewState extends State<AdminDataView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        LayoutBuilder(
-          builder: (context, box) => Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              SizedBox(
-                width: box.maxWidth < 560
-                    ? box.maxWidth
-                    : path == '/jadwal-praktik'
-                    ? 216
-                    : 260,
-                child: Semantics(
-                  container: true,
-                  child: TextField(
-                    decoration: InputDecoration(
-                      labelText: path == '/dokter'
-                          ? 'Cari dokter atau spesialisasi'
-                          : 'Cari nama atau kode',
-                      prefixIcon: const Icon(Icons.search),
+        Container(
+          decoration: AdminStyle.panel,
+          padding: const EdgeInsets.all(12),
+          child: LayoutBuilder(
+            builder: (context, box) => Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                SizedBox(
+                  width: box.maxWidth < 560
+                      ? box.maxWidth
+                      : path == '/jadwal-praktik'
+                      ? 216
+                      : 300,
+                  child: Semantics(
+                    container: true,
+                    child: TextField(
+                      decoration: InputDecoration(
+                        labelText: path == '/dokter'
+                            ? 'Cari dokter atau spesialisasi'
+                            : 'Cari nama atau kode',
+                        prefixIcon: const Icon(Icons.search),
+                      ),
+                      onChanged: (value) =>
+                          setState(() => search = value.trim().toLowerCase()),
                     ),
-                    onChanged: (value) =>
-                        setState(() => search = value.trim().toLowerCase()),
-                  ),
-                ),
-              ),
-
-              SizedBox(
-                width: box.maxWidth < 340 ? box.maxWidth : 132,
-                child: ChoiceField(
-                  label: 'Status data',
-                  choices: const [
-                    ('', 'Semua status'),
-                    ('true', 'Aktif'),
-                    ('false', 'Nonaktif'),
-                  ],
-                  value: status,
-                  onChanged: (value) => setState(() => status = value ?? ''),
-                ),
-              ),
-              if (path != '/layanan')
-                SizedBox(
-                  width: box.maxWidth < 340 ? box.maxWidth : 170,
-                  child: ChoiceField(
-                    label: 'Filter poliklinik',
-                    choices: [
-                      ('', 'Semua poliklinik'),
-                      ...choicesOf(widget.catalog['/layanan'] ?? []),
-                    ],
-                    value: clinic,
-                    onChanged: (value) => setState(() => clinic = value ?? ''),
-                  ),
-                ),
-              if (sessions)
-                SizedBox(
-                  width: box.maxWidth < 340 ? box.maxWidth : 170,
-                  child: ChoiceField(
-                    label: 'Filter dokter',
-                    choices: [
-                      ('', 'Semua dokter'),
-                      ...choicesOf(widget.catalog['/dokter'] ?? []),
-                    ],
-                    value: doctor,
-                    onChanged: (value) => setState(() => doctor = value ?? ''),
                   ),
                 ),
 
-              ...widget.toolbarActions,
-            ],
+                SizedBox(
+                  width: box.maxWidth < 340 ? box.maxWidth : 160,
+                  child: ChoiceField(
+                    label: 'Status data',
+                    choices: const [
+                      ('', 'Semua status'),
+                      ('true', 'Aktif'),
+                      ('false', 'Nonaktif'),
+                    ],
+                    value: status,
+                    onChanged: (value) => setState(() => status = value ?? ''),
+                  ),
+                ),
+                if (path != '/layanan')
+                  SizedBox(
+                    width: box.maxWidth < 340 ? box.maxWidth : 170,
+                    child: ChoiceField(
+                      label: 'Filter poliklinik',
+                      choices: [
+                        ('', 'Semua poliklinik'),
+                        ...choicesOf(widget.catalog['/layanan'] ?? []),
+                      ],
+                      value: clinic,
+                      onChanged: (value) =>
+                          setState(() => clinic = value ?? ''),
+                    ),
+                  ),
+                if (sessions)
+                  SizedBox(
+                    width: box.maxWidth < 340 ? box.maxWidth : 170,
+                    child: ChoiceField(
+                      label: 'Filter dokter',
+                      choices: [
+                        ('', 'Semua dokter'),
+                        ...choicesOf(widget.catalog['/dokter'] ?? []),
+                      ],
+                      value: doctor,
+                      onChanged: (value) =>
+                          setState(() => doctor = value ?? ''),
+                    ),
+                  ),
+
+                ...widget.toolbarActions,
+              ],
+            ),
           ),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 2),
           child: Text(
-            '${filtered.length} dari ${source.length} ${path == '/slot-praktik' ? 'sesi praktik' : 'data'}',
+            path == '/dokter'
+                ? '${filtered.length} dari ${source.length} dokter'
+                : '${filtered.length} dari ${source.length} ${path == '/slot-praktik' ? 'sesi praktik' : 'data'}',
+            style: Theme.of(context).textTheme.bodySmall,
           ),
         ),
         if (filtered.isEmpty && !widget.busy)
@@ -756,16 +857,42 @@ class _AdminSlotSessionState extends State<AdminSlotSession> {
     final visible = state.slots
         .where((s) => widget.status.isEmpty || '${s['aktif']}' == widget.status)
         .toList();
-    return Card(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: QueueBStyle.border),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
         dense: true,
         visualDensity: VisualDensity.compact,
-        tilePadding: const EdgeInsets.symmetric(horizontal: 12),
-        title: Text(
-          '${dateOnly(widget.session['tanggal'])} · ${widget.api.config.instantLabel(widget.session['mulaiPada']).split(' ').last}–${widget.api.config.instantLabel(widget.session['selesaiPada']).split(' ').last}',
+        tilePadding: const EdgeInsets.symmetric(horizontal: 10),
+        shape: const Border(),
+        collapsedShape: const Border(),
+        title: Tooltip(
+          message: label(object(widget.session['loket'])),
+          child: Text(
+            '${dateOnly(widget.session['tanggal'])} · '
+            '${clockOnly(widget.api.config.localInput(widget.session['mulaiPada']))}'
+            '–${clockOnly(widget.api.config.localInput(widget.session['selesaiPada']))}'
+            ' · ${label(object(widget.session['loket']))}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          ),
         ),
-        subtitle: Text(
-          '${label(object(widget.session['loket']))} · ${widget.session['aktif'] == true ? 'Sesi aktif' : 'Sesi nonaktif'}',
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              widget.session['aktif'] == true ? 'Aktif' : 'Nonaktif',
+              style: const TextStyle(fontSize: 11, color: QueueBStyle.muted),
+            ),
+            const SizedBox(width: 6),
+            Icon(expanded ? Icons.expand_less : Icons.expand_more, size: 20),
+          ],
         ),
         expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
         onExpansionChanged: (v) {
@@ -789,6 +916,10 @@ class _AdminSlotSessionState extends State<AdminSlotSession> {
                   const AdminNotice('Tidak ada slot yang sesuai filter.'),
                 AdminTable(
                   rows: visible,
+                  pageSize: 5,
+                  numberedPagination: true,
+                  hideFooterWhenSinglePage: true,
+                  paginationLabel: 'slot',
                   columns: [
                     AdminColumn(
                       'Jam slot',

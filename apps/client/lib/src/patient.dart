@@ -23,6 +23,7 @@ import 'api.dart';
 import 'config.dart';
 import 'widgets.dart';
 import 'mobile_ui.dart';
+import 'queueb_feedback.dart';
 import 'patient_design.dart';
 import 'patient_agenda.dart';
 import 'patient_sync.dart';
@@ -41,6 +42,7 @@ import 'patient_navigation.dart';
 import 'user_profile.dart';
 import 'patient_reservations.dart';
 import 'patient_ticket_pdf.dart';
+import 'patient_notifications.dart';
 import 'patient_mobile_v5.dart';
 import 'patient_scroll_shell.dart';
 
@@ -350,7 +352,7 @@ class _PatientPageState extends State<PatientPage> {
         } else {
           setState(() {
             _reservationCreating = true;
-            reservationMode = uri.queryParameters['mode'] ?? 'clinics';
+            reservationMode = uri.queryParameters['mode'] ?? 'doctors';
           });
         }
       }
@@ -826,74 +828,6 @@ class _PatientPageState extends State<PatientPage> {
     );
   }
 
-  List<Widget> _catalog(BuildContext context) {
-    final visible = services
-        .where(
-          (s) =>
-              (channel != 'Walk-in' ||
-                  s['modeReservasi'] != 'JANJI_TEMU_DOKTER') &&
-              (channel != 'Janji temu' ||
-                  s['modeReservasi'] != 'ANTREAN_HARIAN') &&
-              (label(s).toLowerCase().contains(search) ||
-                  doctors.any(
-                    (d) =>
-                        label(d).toLowerCase().contains(search) &&
-                        rows(d['dokterLayanan']).any(
-                          (l) =>
-                              l['layananId'] == s['id'] && l['aktif'] == true,
-                        ),
-                  )),
-        )
-        .toList();
-    return [
-      TextField(
-        decoration: const InputDecoration(
-          hintText: 'Cari poliklinik atau dokter',
-          prefixIcon: Icon(Icons.search),
-        ),
-        onChanged: (v) => setState(() => search = v.toLowerCase().trim()),
-      ),
-      const SizedBox(height: 12),
-      Wrap(
-        spacing: 8,
-        children: [
-          for (final c in ['Semua', 'Janji temu', 'Walk-in'])
-            FilterChip(
-              label: Text(c),
-              selected: channel == c,
-              onSelected: busy || loading
-                  ? null
-                  : (_) => setState(() => channel = c),
-            ),
-        ],
-      ),
-      const SizedBox(height: 12),
-      if (visible.isEmpty && !loading)
-        const EmptyState(text: 'Tidak ada poliklinik yang sesuai pencarian.'),
-      LayoutBuilder(
-        builder: (context, box) => Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            for (final s in visible)
-              SizedBox(
-                width: (box.maxWidth - 12) / 2,
-                height: 112,
-                child: ClinicCard(
-                  name: label(s),
-                  selected: serviceId == s['id'],
-                  onTap: busy || loading
-                      ? null
-                      : () => selectService('${s['id']}'),
-                ),
-              ),
-          ],
-        ),
-      ),
-      const SizedBox(height: 20),
-    ];
-  }
-
   List<Json> clinicsForQuery(String query) => services
       .where(
         (clinic) =>
@@ -936,9 +870,17 @@ class _PatientPageState extends State<PatientPage> {
     if (!loading && walkIns.isNotEmpty) {
       _entranceServices ??= walkIns.take(5).map((s) => '${s['id']}').toList();
     }
-    return PatientHomeTabs(
-      value: homeMode,
-      onChanged: busy ? null : (mode) => setState(() => homeMode = mode),
+    return PatientNativeHomeTabs(
+      walkInSelected: homeMode == PatientHomeMode.walkIn,
+      onChanged: busy
+          ? null
+          : (walkIn) => setState(() {
+              homeMode = walkIn
+                  ? PatientHomeMode.walkIn
+                  : PatientHomeMode.values.firstWhere(
+                      (mode) => mode != PatientHomeMode.walkIn,
+                    );
+            }),
       headerSlivers: [
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -1029,6 +971,12 @@ class _PatientPageState extends State<PatientPage> {
                             '${walkIns[index]['id']}',
                             widget.api.config.today,
                             available: hoursAvailable,
+                          ),
+                          staffName: patientServiceProviderLabel(
+                            doctors: doctors,
+                            sessions: homeSchedules,
+                            serviceId: '${walkIns[index]['id']}',
+                            date: widget.api.config.today,
                           ),
                           queue: queue.forService(
                             '${walkIns[index]['id']}',
@@ -1229,17 +1177,8 @@ class _PatientPageState extends State<PatientPage> {
                         },
                         onNotifications: () => showDialog<void>(
                           context: context,
-                          builder: (c) => AlertDialog(
-                            title: const Text('Notifikasi'),
-                            content: const Text(
-                              'Notifikasi belum tersedia. Periksa status terbaru melalui Reservasi.',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(c),
-                                child: const Text('Tutup'),
-                              ),
-                            ],
+                          builder: (c) => PatientNotificationsDialog(
+                            repository: repository,
                           ),
                         ),
                       )
@@ -1339,7 +1278,7 @@ class _PatientPageState extends State<PatientPage> {
                                           ),
                                         ],
                                         if (message != null)
-                                          MobileNotice(message!),
+                                          MobileNotice(message!, success: true),
                                         if (loading)
                                           const LinearProgressIndicator(
                                             semanticsLabel:
@@ -1387,7 +1326,7 @@ class _PatientPageState extends State<PatientPage> {
                     ),
                   ],
                   if (loading) const LinearProgressIndicator(),
-                  if (message != null) MobileNotice(message!),
+                  if (message != null) MobileNotice(message!, success: true),
                   if (_routeError != null) ...[
                     MobileNotice(_routeError!, error: true),
                     TextButton(
@@ -1566,9 +1505,92 @@ class _PatientPageState extends State<PatientPage> {
     return name.isEmpty || name == code ? code : '$code · $name';
   }
 
+  /// Return to the real entry point instead of recreating a service catalog.
+  /// A doctor opened from Home can still step back to the service detail;
+  /// doctor/nearest searches return directly to their filtered result list.
+  void _backFromBookingDetail() {
+    if (busy || loading) return;
+    final fromSearch = const {'doctors', 'nearest'}.contains(reservationMode);
+    final doctorRoute =
+        widget.location?.path.startsWith('/patient/reservations/doctors/') ==
+        true;
+    final previousClinicId = serviceId;
+
+    if (doctorRoute && !fromSearch && previousClinicId != null) {
+      setState(() {
+        booking.invalidate();
+        bookingStage = doctorDetail = false;
+        doctorId = sessionId = slotId = null;
+        schedules = [];
+        slots = [];
+      });
+      _go(
+        Uri(
+          path: '/patient/reservations/new',
+          queryParameters: {'clinic': previousClinicId},
+        ).toString(),
+      );
+      return;
+    }
+
+    setState(() {
+      booking.invalidate();
+      bookingStage = doctorDetail = false;
+      serviceId = doctorId = sessionId = slotId = null;
+      schedules = [];
+      slots = [];
+      clinicSchedules = [];
+      search = '';
+      if (widget.navigationShell == null) {
+        reservationCreating = fromSearch;
+        tab = fromSearch ? 2 : 0;
+      }
+    });
+    if (fromSearch) {
+      _go(
+        Uri(
+          path: '/patient/reservations/new',
+          queryParameters: {'mode': reservationMode},
+        ).toString(),
+      );
+      if (reservationMode == 'nearest') unawaited(loadNearest());
+    } else {
+      _go('/patient');
+    }
+  }
+
   Widget _registration(BuildContext context) {
-    if (serviceId == null && ['doctors', 'nearest'].contains(reservationMode)) {
-      return reservationDoctors(context);
+    if (serviceId == null) {
+      if (const {'doctors', 'nearest'}.contains(reservationMode)) {
+        return reservationDoctors(context);
+      }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PatientHeading(title: 'Reservasi', onBack: showReservations),
+          const MobileNotice(
+            'Pilih layanan walk-in dari Beranda, atau gunakan Cari Dokter '
+            'dan Jadwal Terdekat pada menu Reservasi.',
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: busy
+                ? null
+                : () {
+                    if (widget.navigationShell != null) {
+                      _go('/patient');
+                    } else {
+                      setState(() {
+                        reservationCreating = false;
+                        tab = 0;
+                      });
+                    }
+                  },
+            icon: const Icon(Icons.home_outlined),
+            label: const Text('Kembali ke Beranda'),
+          ),
+        ],
+      );
     }
     final doctor =
         doctors.where((d) => d['id'] == doctorId).firstOrNull ??
@@ -1588,52 +1610,10 @@ class _PatientPageState extends State<PatientPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         PatientHeading(
-          title: bookingStage
-              ? 'Detail Dokter'
-              : serviceId == null
-              ? (reservationMode == 'clinics'
-                    ? 'Buat Reservasi'
-                    : 'Poliklinik & Dokter')
-              : clinicName,
-          onBack: serviceId == null
-              ? showReservations
-              : busy || loading
-              ? null
-              : () {
-                  if (widget.location?.path.startsWith(
-                        '/patient/reservations/doctors/',
-                      ) ==
-                      true) {
-                    setState(() {
-                      booking.invalidate();
-                      bookingStage = doctorDetail = false;
-                      doctorId = sessionId = slotId = null;
-                    });
-                    _go(
-                      Uri(
-                        path: '/patient/reservations/new',
-                        queryParameters: serviceId == null
-                            ? null
-                            : {'clinic': serviceId!},
-                      ).toString(),
-                    );
-                    return;
-                  }
-                  setState(() {
-                    booking.invalidate();
-                    if (bookingStage) {
-                      bookingStage = false;
-                      doctorDetail = false;
-                      doctorId = sessionId = slotId = null;
-                    } else {
-                      serviceId = null;
-                      search = '';
-                    }
-                  });
-                },
+          title: bookingStage ? 'Detail Dokter' : clinicName,
+          onBack: busy || loading ? null : _backFromBookingDetail,
         ),
         if (!bookingStage) ...[
-          if (serviceId == null) ..._catalog(context),
           if (selectedService != null) ...[
             SegmentedButton<bool>(
               segments: [
@@ -1760,7 +1740,7 @@ class _PatientPageState extends State<PatientPage> {
             controller: date,
             enabled: !busy && !loading,
             decoration: InputDecoration(
-              labelText: 'Tanggal pelayanan (YYYY-MM-DD)',
+              labelText: 'Tanggal pelayanan',
               suffixIcon: IconButton(
                 tooltip: 'Pilih tanggal pelayanan',
                 onPressed: busy || loading
@@ -2258,9 +2238,15 @@ class PatientBranchView extends StatelessWidget {
     final owner = context
         .dependOnInheritedWidgetOfExactType<_PatientViewScope>()!
         .owner;
+    final branch = owner.widget.navigationShell?.currentIndex;
+    final content = owner.branch(context, index, bookingView: bookingView);
     return PopScope(
       canPop: kIsWeb || !bookingView || !owner.busy,
-      child: owner.branch(context, index, bookingView: bookingView),
+      // Root destinations animate without remounting the indexed shell.
+      // Booking/detail routes already use QueueBRouteMotion in app_router.dart.
+      child: bookingView || branch == null
+          ? content
+          : PatientBranchReveal(active: branch == index, child: content),
     );
   }
 }
@@ -2575,13 +2561,13 @@ class _TicketDialogState extends State<_TicketDialog> {
     final session = object(slot['jadwalPraktik']);
     final doctor = object(object(session['dokterLayanan'])['dokter']);
     final sessionRoom = object(session['loket']);
-    final room = sessionRoom.isNotEmpty
-        ? sessionRoom
-        : object(ticket['ruang']);
+    final room = sessionRoom.isNotEmpty ? sessionRoom : object(ticket['ruang']);
     final code = '${room['kode'] ?? ''}'.trim();
     final name = label(room).trim();
     final roomLabel = code.isEmpty || code == name ? name : '$code · $name';
-    final day = dateOnly(ticket['tanggalPelayanan'] ?? ticket['tanggalAntrean']);
+    final day = dateOnly(
+      ticket['tanggalPelayanan'] ?? ticket['tanggalAntrean'],
+    );
     return PatientTicketPdfData(
       queueNumber: '${ticket['nomorAntrean'] ?? '—'}',
       serviceName: label(object(ticket['layanan'])),
@@ -2598,13 +2584,16 @@ class _TicketDialogState extends State<_TicketDialog> {
       reservationType: widget.appointment != null
           ? 'Janji temu dokter'
           : object(ticket['layanan'])['modeReservasi'] == 'ANTREAN_HARIAN'
-              ? 'Antrean harian / Walk-in'
-              : null,
+          ? 'Antrean harian / Walk-in'
+          : null,
     );
   }
 
   Future<void> _exportPdf({required bool print}) async {
-    if (exportingPdf || busy || loading || error != null ||
+    if (exportingPdf ||
+        busy ||
+        loading ||
+        error != null ||
         !widget.repository.active ||
         controller.state.load != PatientLoad.loaded ||
         controller.ticket == null) {
@@ -2623,12 +2612,11 @@ class _TicketDialogState extends State<_TicketDialog> {
       // A system dialog can be dismissed. Do not claim printing succeeded.
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(print
-              ? 'Dialog cetak tidak dapat dibuka. Coba kembali.'
-              : 'PDF belum dapat disimpan. Coba kembali.'),
-        ),
+      QueueBFeedback.error(
+        context,
+        print
+            ? 'Dialog cetak tidak dapat dibuka. Coba kembali.'
+            : 'PDF belum dapat disimpan. Coba kembali.',
       );
     } finally {
       if (mounted) setState(() => exportingPdf = false);
@@ -2807,7 +2795,8 @@ class _TicketDialogState extends State<_TicketDialog> {
                 const SizedBox(height: 10),
                 LayoutBuilder(
                   builder: (context, box) {
-                    final singleColumn = box.maxWidth < 250 ||
+                    final singleColumn =
+                        box.maxWidth < 250 ||
                         MediaQuery.textScalerOf(context).scale(12) > 17;
                     final width = singleColumn
                         ? box.maxWidth
@@ -2830,7 +2819,10 @@ class _TicketDialogState extends State<_TicketDialog> {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: exportingPdf || busy || loading ||
+                        onPressed:
+                            exportingPdf ||
+                                busy ||
+                                loading ||
                                 error != null ||
                                 controller.state.load != PatientLoad.loaded ||
                                 controller.ticket == null
@@ -2846,7 +2838,10 @@ class _TicketDialogState extends State<_TicketDialog> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: exportingPdf || busy || loading ||
+                        onPressed:
+                            exportingPdf ||
+                                busy ||
+                                loading ||
                                 error != null ||
                                 controller.state.load != PatientLoad.loaded ||
                                 controller.ticket == null
@@ -2978,5 +2973,4 @@ class _TicketDialogState extends State<_TicketDialog> {
       ),
     );
   }
-
 }

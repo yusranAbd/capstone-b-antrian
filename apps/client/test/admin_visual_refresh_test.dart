@@ -73,7 +73,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(find.text('Administrator Pengujian!'), findsOneWidget);
+        expect(find.textContaining('Administrator Pengujian!'), findsOneWidget);
         expect(find.text('Asia/Jayapura'), findsOneWidget);
         expect(find.text('0 aktif'), findsOneWidget);
         expect(find.text('2 aktif'), findsOneWidget);
@@ -83,11 +83,9 @@ void main() {
         expect(find.textContaining('%'), findsNothing);
         expect(find.text('Notifikasi'), findsNothing);
         expect(find.byType(TextField), findsNothing);
-        final table = tester.widget<PaginatedDataTable>(
-          find.byType(PaginatedDataTable),
-        );
-        expect(table.dataRowMaxHeight, 48);
-        expect(table.source.rowCount, 1);
+        final table = tester.widget<DataTable>(find.byType(DataTable));
+        expect(table.rows, hasLength(1));
+        expect(table.dataRowMaxHeight, greaterThanOrEqualTo(46));
         expect(tester.takeException(), isNull);
       },
     );
@@ -114,7 +112,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Administrator!'), findsOneWidget);
+      expect(find.textContaining('Administrator!'), findsOneWidget);
       await tester.ensureVisible(find.byTooltip('Muat ulang dashboard'));
       await tester.tap(find.byTooltip('Muat ulang dashboard'));
       expect(reloaded, 1);

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'config.dart';
 import 'mobile_ui.dart';
 import 'doctor_visual.dart';
+import 'doctor_professional.dart';
 
 /// Presentation model only. Waiting order and eligibility come from REST.
 class DoctorDashboardData {
@@ -103,7 +104,7 @@ class DoctorPanel extends StatelessWidget {
   final Widget child;
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(20),
+    padding: const EdgeInsets.all(DoctorStyle.panelPadding),
     decoration: DoctorStyle.panel,
     child: child,
   );
@@ -134,172 +135,96 @@ class DoctorDashboard extends StatelessWidget {
   final AsyncCallback onRefresh;
   final VoidCallback onPickDate;
   final String? error;
+
   @override
   Widget build(BuildContext context) {
-    final data = DoctorDashboardData(appointments, snapshots);
     final current = date == config.today;
+    final data = DoctorDashboardData(
+      available ? appointments : [],
+      available && current ? snapshots : [],
+    );
     return RefreshIndicator(
       onRefresh: onRefresh,
-      child: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 16,
-            runSpacing: 12,
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final desktop =
+              box.maxWidth >= 1100 &&
+              box.maxHeight >= 500 &&
+              MediaQuery.textScalerOf(context).scale(14) <= 17.5;
+          final compact = box.maxHeight < 720;
+          final queue = DoctorQueuePanel(
+            key: ValueKey((date, available)),
+            entries: data.entries,
+            config: config,
+            date: date,
+            available: available,
+            loading: loading,
+            expand: desktop,
+            compact: compact,
+          );
+          final live = DoctorLivePanel(
+            key: ValueKey((date, available)),
+            data: data,
+            config: config,
+            available: available && current && snapshots.isNotEmpty,
+            loading: loading,
+            status: status,
+            expand: desktop,
+            compact: compact,
+          );
+          final schedule = _schedulePanel(
+            context,
+            data,
+            current,
+            expand: desktop,
+            compact: compact,
+          );
+          final feedback = Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Dashboard Dokter',
-                    style: const TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -.5,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    available
-                        ? 'Selamat datang, ${profile['nama'] ?? 'Dokter'}'
-                        : 'Ringkasan praktik dan antrean Anda.',
-                    style: const TextStyle(color: QueueBStyle.muted),
-                  ),
-                ],
-              ),
-              Wrap(
-                spacing: 8,
-                runSpacing: 10,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  ValueListenableBuilder<String>(
-                    valueListenable: status,
-                    builder: (context, value, _) => Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: value == 'Realtime terhubung'
-                            ? QueueBStyle.mint
-                            : QueueBStyle.background,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            value == 'Realtime terhubung'
-                                ? Icons.wifi
-                                : Icons.wifi_off,
-                            size: 20,
-                            color: value == 'Realtime terhubung'
-                                ? QueueBStyle.success
-                                : QueueBStyle.muted,
-                          ),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
-                              value,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: loading ? null : onPickDate,
-                    icon: const Icon(Icons.calendar_month_outlined, size: 18),
-                    label: Text('Tanggal: $date'),
-                  ),
-                  IconButton(
-                    tooltip: 'Muat ulang portal',
-                    onPressed: loading ? null : onRefresh,
-                    icon: const Icon(Icons.refresh),
-                  ),
-                ],
-              ),
+              if (loading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 4),
+                  child: LinearProgressIndicator(minHeight: 3),
+                ),
+              if (error != null) MobileNotice(error!, error: true),
             ],
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 4,
-            child: loading ? const LinearProgressIndicator() : null,
-          ),
-          error == null
-              ? const SizedBox.shrink()
-              : MobileNotice(error!, error: true),
-          const SizedBox(height: 12),
-          LayoutBuilder(
-            builder: (context, box) {
-              final profileCard = DoctorPanel(child: _profile(context));
-              final metrics = <(String, String, String, IconData, Color)>[
-                (
-                  current ? 'Janji Hari Ini' : 'Janji Tanggal Pilihan',
-                  available ? '${appointments.length}' : '—',
-                  'Seluruh status appointment',
-                  Icons.calendar_month_outlined,
-                  QueueBStyle.darkTeal,
-                ),
-                (
-                  'Dalam Antrean',
-                  available && current && snapshots.isNotEmpty
-                      ? '${data.queueTotal}'
-                      : '—',
-                  snapshots.isEmpty
-                      ? 'Belum ada sesi live yang dapat dipantau'
-                      : 'Menunggu + aktif pada sesi live',
-                  Icons.groups_outlined,
-                  QueueBStyle.danger,
-                ),
-                (
-                  'Konsultasi Selesai',
-                  available ? '${data.completed}' : '—',
-                  'Janji temu; walk-in selesai tidak tercakup',
-                  Icons.task_alt,
-                  QueueBStyle.success,
-                ),
-              ];
-              Widget kpi((String, String, String, IconData, Color) m) =>
-                  DoctorPanel(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+          );
+          if (desktop) {
+            return CustomScrollView(
+              key: const ValueKey('doctor-desktop-viewport'),
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverFillRemaining(
+                  hasScrollBody: true,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        DoctorIconTile(icon: m.$4, color: m.$5, size: 52),
-                        const SizedBox(width: 12),
+                        _heading(context, current),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 70),
+                          child: SingleChildScrollView(child: feedback),
+                        ),
+                        const SizedBox(height: 12),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Text(
-                                m.$1,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                m.$2,
-                                style: const TextStyle(
-                                  fontSize: 34,
-                                  height: 1.1,
-                                  fontWeight: FontWeight.w800,
-                                  color: QueueBStyle.navy,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                available ? m.$3 : 'Data belum tersedia',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: QueueBStyle.muted,
+                              Expanded(flex: 63, child: queue),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                flex: 37,
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    Expanded(flex: 7, child: live),
+                                    const SizedBox(height: 12),
+                                    Expanded(flex: 5, child: schedule),
+                                  ],
                                 ),
                               ),
                             ],
@@ -307,252 +232,374 @@ class DoctorDashboard extends StatelessWidget {
                         ),
                       ],
                     ),
-                  );
-              if (box.maxWidth >= 1152) {
-                return IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(flex: 5, child: profileCard),
-                      const SizedBox(width: 12),
-                      for (var i = 0; i < metrics.length; i++) ...[
-                        Expanded(flex: 2, child: kpi(metrics[i])),
-                        if (i < metrics.length - 1) const SizedBox(width: 12),
-                      ],
-                    ],
                   ),
-                );
-              }
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  profileCard,
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      for (final m in metrics)
-                        SizedBox(
-                          width: box.maxWidth < 560
-                              ? box.maxWidth
-                              : box.maxWidth < 850
-                              ? (box.maxWidth - 12) / 2
-                              : (box.maxWidth - 24) / 3,
-                          child: kpi(m),
-                        ),
-                    ],
+                ),
+              ],
+            );
+          }
+          return ListView(
+            key: const ValueKey('doctor-page-scroll'),
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: DoctorStyle.pageInsets(context),
+            children: [
+              _heading(context, current),
+              feedback,
+              const SizedBox(height: 16),
+              queue,
+              const SizedBox(height: 16),
+              live,
+              const SizedBox(height: 16),
+              schedule,
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _heading(BuildContext context, bool current) => LayoutBuilder(
+    builder: (context, box) {
+      final clinics = available
+          ? rows(profile['poliklinik']).map(label).join(' · ')
+          : '';
+      final rooms = available
+          ? schedules
+                .map((s) => object(s['ruang'])['kode'])
+                .where((v) => v != null)
+                .toSet()
+                .join(' · ')
+          : '';
+      final title = Row(
+        children: [
+          ProfessionalDoctorAvatar(
+            config: config,
+            photo: available ? profile['fotoProfil'] : null,
+            radius: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  available
+                      ? 'Selamat datang, ${profile['nama'] ?? 'Dokter'}'
+                      : 'Portal Dokter',
+                  style: const TextStyle(
+                    fontSize: 22,
+                    height: 1.2,
+                    fontWeight: FontWeight.w800,
+                    color: DoctorStyle.ink,
+                    letterSpacing: -.5,
                   ),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 20),
-          LayoutBuilder(
-            builder: (context, box) {
-              final queue = DoctorQueuePanel(
-                key: ValueKey(date),
-                entries: data.entries,
-                config: config,
-                date: date,
-                available: available,
-              );
-              final live = DoctorLivePanel(
-                data: data,
-                config: config,
-                available: available && current && snapshots.isNotEmpty,
-                loading: loading,
-                status: status,
-              );
-              if (box.maxWidth < 1100) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [queue, const SizedBox(height: 16), live],
-                );
-              }
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(flex: 7, child: queue),
-                  const SizedBox(width: 16),
-                  Expanded(flex: 4, child: live),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 20),
-          LayoutBuilder(
-            builder: (context, box) {
-              final practice = DoctorPanel(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    DoctorSectionTitle(
-                      icon: Icons.calendar_month_outlined,
-                      title: current
-                          ? 'Jadwal Praktik Hari Ini'
-                          : 'Jadwal Praktik Tanggal Pilihan',
-                    ),
-                    const SizedBox(height: 12),
-                    if (!available)
-                      const Text('Data jadwal belum tersedia.')
-                    else if (schedules.isEmpty)
-                      const DoctorInfoBlock(
-                        icon: Icons.calendar_month_outlined,
-                        child: Text(
-                          'Tidak ada jadwal untuk tanggal pilihan.',
-                          style: TextStyle(color: QueueBStyle.muted),
-                        ),
-                      )
-                    else
-                      for (final s in schedules) _schedule(context, s),
-                  ],
                 ),
-              );
-              final notes = DoctorPanel(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const DoctorSectionTitle(
-                      title: 'Catatan Klinis Dokter',
-                      icon: Icons.description_outlined,
-                    ),
-                    const SizedBox(height: 12),
-                    const DoctorInfoBlock(
-                      icon: Icons.info_outline,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Pencatatan klinis belum tersedia di QueueB.',
-                            style: TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Portal ini tidak menyediakan data SOAP atau rekam medis. Tidak ada catatan yang disimpan dari halaman ini.',
-                            style: TextStyle(color: QueueBStyle.muted),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: 4),
+                Text(
+                  available
+                      ? [
+                          if (profile['spesialisasi'] != null)
+                            '${profile['spesialisasi']}',
+                          if (clinics.isNotEmpty) clinics,
+                          if (rooms.isNotEmpty) rooms,
+                        ].join(' · ')
+                      : 'Ringkasan praktik dan antrean Anda.',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: QueueBStyle.muted,
+                  ),
                 ),
-              );
-              if (box.maxWidth < 1000) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [practice, const SizedBox(height: 16), notes],
-                );
-              }
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(flex: 6, child: practice),
-                  const SizedBox(width: 16),
-                  Expanded(flex: 5, child: notes),
-                ],
-              );
-            },
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          Text(
-            'Zona pelayanan: ${config.serviceTimeZone} · Operasional antrean oleh PETUGAS',
-            style: const TextStyle(fontSize: 12, color: QueueBStyle.muted),
+        ],
+      );
+      final live = available && current && snapshots.isNotEmpty;
+      final tools = Wrap(
+        spacing: 8,
+        runSpacing: 6,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        alignment: WrapAlignment.end,
+        children: [
+          DoctorStatusPill(
+            label: !available
+                ? 'Data belum tersedia'
+                : live
+                ? 'Praktik Aktif'
+                : 'Tidak ada sesi live',
+            color: live ? QueueBStyle.success : QueueBStyle.muted,
+          ),
+          DoctorDashboardClock(
+            config: config,
+            date: date,
+            onPickDate: onPickDate,
+            loading: loading,
+          ),
+          ValueListenableBuilder<String>(
+            valueListenable: status,
+            builder: (context, value, _) => Tooltip(
+              message: value,
+              child: Icon(
+                value == 'Realtime terhubung'
+                    ? Icons.wifi_rounded
+                    : Icons.sync_rounded,
+                color: value == 'Realtime terhubung'
+                    ? QueueBStyle.success
+                    : QueueBStyle.muted,
+                size: 20,
+              ),
+            ),
+          ),
+          IconButton.outlined(
+            tooltip: 'Muat ulang portal dokter',
+            onPressed: loading ? null : onRefresh,
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.white,
+              side: const BorderSide(color: DoctorStyle.rule),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            icon: const Icon(Icons.refresh_rounded, size: 21),
+          ),
+        ],
+      );
+      if (box.maxWidth >= 1080 &&
+          MediaQuery.textScalerOf(context).scale(14) <= 17.5) {
+        return Row(
+          children: [
+            Expanded(child: title),
+            const SizedBox(width: 16),
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: (box.maxWidth * .53).clamp(540.0, 720.0).toDouble(),
+              ),
+              child: tools,
+            ),
+          ],
+        );
+      }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [title, const SizedBox(height: 12), tools],
+      );
+    },
+  );
+
+  Widget _schedulePanel(
+    BuildContext context,
+    DoctorDashboardData data,
+    bool current, {
+    required bool expand,
+    required bool compact,
+  }) {
+    final totalMinutes = available
+        ? schedules.where((s) => s['aktif'] == true).fold<int>(0, (sum, s) {
+            final start = DateTime.tryParse('${s['mulaiPada']}'),
+                end = DateTime.tryParse('${s['selesaiPada']}');
+            return sum +
+                (start == null || end == null
+                    ? 0
+                    : math.max(0, end.difference(start).inMinutes));
+          })
+        : null;
+    final duration = totalMinutes == null
+        ? '—'
+        : totalMinutes >= 60
+        ? '${totalMinutes ~/ 60} j${totalMinutes % 60 == 0 ? '' : ' ${totalMinutes % 60} m'}'
+        : '$totalMinutes m';
+    Widget fact(IconData icon, String title, String value) => Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 5),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 15, color: DoctorStyle.primary),
+                const SizedBox(width: 5),
+                Flexible(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: QueueBStyle.muted,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 3),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: DoctorStyle.ink,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    final list = !available
+        ? const Padding(
+            padding: EdgeInsets.all(8),
+            child: Text(
+              'Data jadwal belum tersedia.',
+              style: TextStyle(color: QueueBStyle.muted, fontSize: 12),
+            ),
+          )
+        : schedules.isEmpty
+        ? const DoctorInfoBlock(
+            icon: Icons.event_busy_outlined,
+            child: Text(
+              'Tidak ada jadwal pada tanggal pilihan.',
+              style: TextStyle(color: QueueBStyle.muted, fontSize: 12),
+            ),
+          )
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final s in schedules) _schedule(s, compact: compact),
+            ],
+          );
+    return DoctorPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              DoctorIconTile(
+                icon: Icons.calendar_today_outlined,
+                size: compact ? 30 : 36,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  current
+                      ? 'Jadwal Praktik Hari Ini'
+                      : 'Jadwal Praktik Terpilih',
+                  style: TextStyle(
+                    fontSize: compact ? 15 : 17,
+                    fontWeight: FontWeight.w800,
+                    color: DoctorStyle.ink,
+                  ),
+                ),
+              ),
+              DoctorStatusPill(
+                label: available ? '${schedules.length} sesi' : '—',
+                color: DoctorStyle.primary,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (expand)
+            Expanded(child: SingleChildScrollView(child: list))
+          else
+            list,
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Divider(height: 1, color: DoctorStyle.rule),
+          ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              fact(Icons.access_time_rounded, 'Durasi sesi', duration),
+              fact(
+                Icons.task_alt_rounded,
+                'Janji selesai',
+                available ? '${data.completed}' : '—',
+              ),
+              fact(
+                Icons.people_outline_rounded,
+                'Menunggu dimuat',
+                available
+                    ? '${data.entries.where((r) => r['status'] == 'MENUNGGU').length}'
+                    : '—',
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _profile(BuildContext context) {
-    final name = available ? '${profile['nama'] ?? 'Dokter'}' : 'Profil dokter';
-    final clinics = rows(profile['poliklinik']).map(label).join(' · ');
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        DoctorAvatar(size: MediaQuery.sizeOf(context).width < 600 ? 64 : 96),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                name,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                available
-                    ? '${profile['spesialisasi'] ?? 'Dokter'}'
-                    : 'Data belum tersedia',
-                style: const TextStyle(color: QueueBStyle.muted),
-              ),
-              const SizedBox(height: 10),
-              if (available)
-                Text(
-                  clinics.isEmpty ? 'Belum ada poliklinik terkait.' : clinics,
-                  style: const TextStyle(fontSize: 12),
-                ),
-              const SizedBox(height: 10),
-              doctorBadge(
-                available && snapshots.isNotEmpty && date == config.today
-                    ? 'Praktik Aktif'
-                    : 'Tidak ada sesi live aktif',
-                color: available && snapshots.isNotEmpty
-                    ? QueueBStyle.darkTeal
-                    : QueueBStyle.muted,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _schedule(BuildContext context, Json s) {
+  Widget _schedule(Json s, {required bool compact}) {
     final start = DateTime.tryParse('${s['mulaiPada']}'),
         end = DateTime.tryParse('${s['selesaiPada']}');
-    final state = s['aktif'] != true
+    final sessionState = s['aktif'] != true
         ? 'Nonaktif'
-        : end != null && !end.isAfter(config.now)
+        : start == null || end == null
+        ? 'Waktu belum tersedia'
+        : !end.isAfter(config.now)
         ? 'Selesai'
-        : start != null && start.isAfter(config.now)
+        : start.isAfter(config.now)
         ? 'Akan datang'
         : 'Berlangsung';
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Wrap(
-        spacing: 16,
-        runSpacing: 8,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          SizedBox(
-            width: 114,
-            child: Text(
-              doctorTime(s, config),
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ),
-          SizedBox(
-            width: 180,
-            child: Text(
-              '${object(s['ruang'])['kode'] ?? ''} · ${label(object(s['ruang']))}',
-            ),
-          ),
-          Text(
-            label(object(s['poliklinik'])),
-            style: const TextStyle(color: QueueBStyle.muted),
-          ),
-          doctorBadge(
-            state,
-            color: state == 'Berlangsung'
-                ? QueueBStyle.darkTeal
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xfff8faff),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: DoctorStyle.rule),
+      ),
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final identity = Row(
+            children: [
+              const DoctorIconTile(
+                icon: Icons.event_available_outlined,
+                size: 30,
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      doctorTime(s, config),
+                      style: TextStyle(
+                        fontSize: compact ? 16 : 20,
+                        fontWeight: FontWeight.w800,
+                        color: DoctorStyle.ink,
+                      ),
+                    ),
+                    Text(
+                      '${object(s['ruang'])['kode'] ?? label(object(s['ruang']))} · ${label(object(s['poliklinik']))}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: QueueBStyle.muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+          final badge = DoctorStatusPill(
+            label: sessionState,
+            color: sessionState == 'Berlangsung'
+                ? QueueBStyle.success
                 : QueueBStyle.muted,
-          ),
-        ],
+          );
+          return box.maxWidth >= 340 &&
+                  MediaQuery.textScalerOf(context).scale(14) <= 18
+              ? Row(
+                  children: [
+                    Expanded(child: identity),
+                    const SizedBox(width: 8),
+                    badge,
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [identity, const SizedBox(height: 6), badge],
+                );
+        },
       ),
     );
   }
@@ -562,7 +609,8 @@ void showDoctorQueueDetail(BuildContext context, Json row, AppConfig config) =>
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Detail antrean ${row['nomorAntrean']}'),
+        title: Text('Detail antrean ${row['nomorAntrean'] ?? '—'}'),
+        scrollable: true,
         content: SizedBox(
           width: 430,
           child: Column(
@@ -571,6 +619,8 @@ void showDoctorQueueDetail(BuildContext context, Json row, AppConfig config) =>
             children: [
               Text(label(object(row['poliklinik']))),
               Text(label(object(row['ruang']))),
+              if (object(row['ruang'])['lokasi'] != null)
+                Text('${object(row['ruang'])['lokasi']}'),
               const SizedBox(height: 12),
               Text('Waktu slot: ${doctorTime(row, config)}'),
               Text('Status: ${doctorStatus(row['status'])}'),
@@ -582,7 +632,7 @@ void showDoctorQueueDetail(BuildContext context, Json row, AppConfig config) =>
                 ),
               const SizedBox(height: 16),
               const Text(
-                'Nama pasien, keluhan dan catatan klinis tidak disediakan pada portal ini.',
+                'Nama pasien, identitas dan catatan klinis tidak disediakan pada portal ini.',
               ),
             ],
           ),
@@ -603,209 +653,312 @@ class DoctorQueuePanel extends StatefulWidget {
     required this.config,
     required this.date,
     required this.available,
+    this.loading = false,
+    this.expand = false,
+    this.compact = false,
   });
   final List<Json> entries;
   final AppConfig config;
   final String date;
-  final bool available;
+  final bool available, loading, expand, compact;
   @override
   State<DoctorQueuePanel> createState() => _DoctorQueuePanelState();
 }
 
 class _DoctorQueuePanelState extends State<DoctorQueuePanel> {
-  String search = '', status = '';
-  int page = 0;
+  String search = '', group = 'all', clinic = '';
+  int page = 0, pageSize = 5;
+  String clinicKey(Json row) {
+    final value = object(row['poliklinik']);
+    return '${value['id'] ?? value['kode'] ?? value['nama'] ?? ''}';
+  }
+
+  bool inGroup(Json row, String value) => switch (value) {
+    'waiting' => row['status'] == 'MENUNGGU',
+    'active' => ['DIPANGGIL', 'DILAYANI'].contains(row['status']),
+    'completed' => row['status'] == 'SELESAI',
+    _ => true,
+  };
   @override
   Widget build(BuildContext context) {
-    final filtered = widget.entries
+    final source = widget.available ? widget.entries : <Json>[];
+    final clinics = <String, String>{
+      for (final row in source)
+        if (clinicKey(row).isNotEmpty)
+          clinicKey(row): label(object(row['poliklinik'])),
+    };
+    if (clinic.isNotEmpty && !clinics.containsKey(clinic)) clinic = '';
+    final scoped = source
+        .where((row) => clinic.isEmpty || clinicKey(row) == clinic)
+        .toList();
+    final filtered = scoped
         .where(
-          (e) =>
-              (status.isEmpty || e['status'] == status) &&
-              '${e['nomorAntrean']} ${label(object(e['poliklinik']))} ${label(object(e['ruang']))}'
+          (row) =>
+              inGroup(row, group) &&
+              '${row['nomorAntrean'] ?? ''} ${label(object(row['poliklinik']))} ${label(object(row['ruang']))} ${object(row['ruang'])['kode'] ?? ''}'
                   .toLowerCase()
                   .contains(search),
         )
         .toList();
-    final pages = math.max(1, (filtered.length / 10).ceil());
-    page = page.clamp(0, pages - 1);
-    final shown = filtered.skip(page * 10).take(10).toList();
+    Widget tab(String value, String title) => ChoiceChip(
+      label: Text(
+        '$title (${widget.available ? scoped.where((r) => inGroup(r, value)).length : '—'})',
+      ),
+      selected: group == value,
+      showCheckmark: false,
+      selectedColor: DoctorStyle.primary,
+      backgroundColor: Colors.white,
+      labelStyle: TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        color: group == value ? Colors.white : DoctorStyle.ink,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      side: BorderSide(
+        color: group == value ? DoctorStyle.primary : DoctorStyle.rule,
+      ),
+      materialTapTargetSize: widget.compact
+          ? MaterialTapTargetSize.shrinkWrap
+          : MaterialTapTargetSize.padded,
+      visualDensity: widget.compact
+          ? VisualDensity.compact
+          : VisualDensity.standard,
+      onSelected: (_) => setState(() {
+        group = value;
+        page = 0;
+      }),
+    );
+    final tabs = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        tab('waiting', 'Menunggu'),
+        const SizedBox(width: 6),
+        tab('active', 'Dilayani'),
+        const SizedBox(width: 6),
+        tab('completed', 'Selesai'),
+        const SizedBox(width: 6),
+        tab('all', 'Semua'),
+      ],
+    );
+    final table = LayoutBuilder(
+      builder: (context, box) => _table(context, box, filtered),
+    );
     return DoctorPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: widget.expand ? MainAxisSize.max : MainAxisSize.min,
         children: [
-          DoctorSectionTitle(
-            title: 'Daftar Antrean Poli',
-            icon: Icons.calendar_month_outlined,
-            subtitle: widget.date,
-          ),
-          const SizedBox(height: 18),
           LayoutBuilder(
-            builder: (context, box) => Wrap(
-              spacing: 12,
-              runSpacing: 10,
-              children: [
-                SizedBox(
-                  width: box.maxWidth >= 620
-                      ? (box.maxWidth - 12) * .67
-                      : box.maxWidth,
-                  child: TextField(
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.search),
-                      hintText: 'Cari nomor antrean, poli, atau ruang',
-                      isDense: true,
-                    ),
-                    onChanged: (v) => setState(() {
-                      search = v.trim().toLowerCase();
-                      page = 0;
-                    }),
+            builder: (context, box) {
+              final title = Row(
+                children: [
+                  const DoctorIconTile(
+                    icon: Icons.format_list_bulleted_rounded,
+                    size: 34,
                   ),
-                ),
-                SizedBox(
-                  width: box.maxWidth >= 620
-                      ? (box.maxWidth - 12) * .33
-                      : box.maxWidth,
-                  child: DropdownButtonFormField<String>(
-                    initialValue: '',
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Status antrean',
-                      isDense: true,
-                    ),
-                    items: [
-                      const DropdownMenuItem(
-                        value: '',
-                        child: Text('Semua status'),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Text(
+                      'Daftar Antrean Poli',
+                      style: TextStyle(
+                        fontSize: widget.compact ? 16 : 19,
+                        fontWeight: FontWeight.w800,
+                        color: DoctorStyle.ink,
                       ),
-                      for (final s in [
-                        'DIPESAN',
-                        'CHECK_IN',
-                        'MENUNGGU',
-                        'DIPANGGIL',
-                        'DILAYANI',
-                        'SELESAI',
-                        'DILEWATI',
-                        'DIBATALKAN',
-                      ])
-                        DropdownMenuItem(
-                          value: s,
-                          child: Text(doctorStatus(s)),
-                        ),
-                    ],
-                    onChanged: (v) => setState(() {
-                      status = v ?? '';
-                      page = 0;
-                    }),
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              );
+              return box.maxWidth >= 620 &&
+                      MediaQuery.textScalerOf(context).scale(14) <= 18
+                  ? Row(
+                      children: [
+                        Expanded(flex: 4, child: title),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 7,
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: tabs,
+                          ),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        title,
+                        const SizedBox(height: 8),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: tabs,
+                        ),
+                      ],
+                    );
+            },
           ),
-          const SizedBox(height: 12),
-          if (!widget.available)
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('Data antrean belum tersedia.'),
-            )
-          else if (shown.isEmpty)
-            const DoctorQueueEmpty()
-          else
-            LayoutBuilder(
-              builder: (context, box) => SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: SizedBox(
-                  width: math.max(700, box.maxWidth),
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: QueueBStyle.background,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Row(
-                          children: [
-                            Expanded(flex: 2, child: Text('No. Antrean')),
-                            Expanded(flex: 2, child: Text('Jenis / slot')),
-                            Expanded(
-                              flex: 3,
-                              child: Text('Poliklinik / ruang'),
-                            ),
-                            Expanded(flex: 2, child: Text('Status')),
-                            SizedBox(width: 60, child: Text('Detail')),
-                          ],
-                        ),
-                      ),
-                      for (final row in shown) _row(row),
-                    ],
+          const SizedBox(height: 10),
+          LayoutBuilder(
+            builder: (context, box) {
+              final field = TextField(
+                onChanged: (value) => setState(() {
+                  search = value.trim().toLowerCase();
+                  page = 0;
+                }),
+                style: const TextStyle(fontSize: 13),
+                decoration: const InputDecoration(
+                  hintText: 'Cari nomor antrean, poli, atau ruang…',
+                  hintStyle: TextStyle(fontSize: 12),
+                  prefixIcon: Icon(Icons.search_rounded, size: 21),
+                  prefixIconConstraints: BoxConstraints(
+                    minHeight: 40,
+                    minWidth: 40,
                   ),
                 ),
-              ),
-            ),
+              );
+              final filter = DropdownButtonFormField<String>(
+                key: ValueKey(
+                  'doctor-clinic:$clinic:${clinics.keys.join(',')}',
+                ),
+                initialValue: clinic,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Layanan',
+                  floatingLabelBehavior: FloatingLabelBehavior.always,
+                  prefixIcon: Icon(Icons.filter_alt_outlined, size: 19),
+                  prefixIconConstraints: BoxConstraints(
+                    minHeight: 40,
+                    minWidth: 36,
+                  ),
+                ),
+                items: [
+                  const DropdownMenuItem(
+                    value: '',
+                    child: Text(
+                      'Semua layanan',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                  for (final e in clinics.entries)
+                    DropdownMenuItem(
+                      value: e.key,
+                      child: Text(
+                        e.value,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                ],
+                onChanged: !widget.available
+                    ? null
+                    : (value) => setState(() {
+                        clinic = value ?? '';
+                        page = 0;
+                      }),
+              );
+              return box.maxWidth >= 560
+                  ? Row(
+                      children: [
+                        Expanded(child: field),
+                        const SizedBox(width: 10),
+                        SizedBox(width: 185, child: filter),
+                      ],
+                    )
+                  : Column(
+                      children: [field, const SizedBox(height: 10), filter],
+                    );
+            },
+          ),
           const SizedBox(height: 10),
+          if (widget.expand)
+            Expanded(child: table)
+          else
+            SizedBox(
+              height: MediaQuery.textScalerOf(context).scale(390),
+              child: table,
+            ),
+          const SizedBox(height: 4),
           Row(
             children: [
-              Expanded(
-                child: Text(
-                  '${widget.available ? filtered.length : '—'} antrean · halaman ${page + 1}/$pages',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: QueueBStyle.muted,
-                  ),
+              const Spacer(),
+              const Tooltip(
+                message: 'Identitas pasien dan catatan medis tidak disediakan. Pencarian berlaku pada data yang dimuat; snapshot maksimal 100 entri per sesi.',
+                child: Icon(
+                  Icons.info_outline_rounded,
+                  size: 15,
+                  color: QueueBStyle.muted,
                 ),
               ),
-              IconButton(
-                tooltip: 'Antrean sebelumnya',
-                onPressed: page == 0 ? null : () => setState(() => page--),
-                icon: const Icon(Icons.chevron_left),
-              ),
-              IconButton(
-                tooltip: 'Antrean berikutnya',
-                onPressed: page + 1 >= pages
-                    ? null
-                    : () => setState(() => page++),
-                icon: const Icon(Icons.chevron_right),
-              ),
             ],
-          ),
-          const Text(
-            'Nama pasien dan keluhan tidak tersedia. Urutan menunggu mengikuti snapshot sesi; daftar juga mencakup appointment tanggal pilihan.',
-            style: TextStyle(fontSize: 11, color: QueueBStyle.muted),
           ),
         ],
       ),
     );
   }
 
-  Widget _row(Json row) {
-    final active = ['DIPANGGIL', 'DILAYANI'].contains(row['status']);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      decoration: BoxDecoration(
-        color: active ? QueueBStyle.mint : Colors.white,
-        border: const Border(bottom: BorderSide(color: QueueBStyle.border)),
+  Widget _table(BuildContext context, BoxConstraints box, List<Json> filtered) {
+    final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+    final wide = box.maxWidth >= 560 && scale <= 1.35;
+    final footerHeight = (box.maxWidth < 440 ? 72 : 48) * scale;
+    final headerHeight = wide ? 34 * scale : 0.0;
+    final size =
+        ((box.maxHeight - footerHeight - headerHeight - 8) /
+                ((wide ? 68 : 148) * scale))
+            .floor()
+            .clamp(1, 5)
+            .toInt();
+    if (size != pageSize) {
+      page = (page * pageSize) ~/ size;
+      pageSize = size;
+    }
+    final pages = math.max(1, (filtered.length / size).ceil());
+    page = page.clamp(0, pages - 1).toInt();
+    final start = page * size;
+    final shown = filtered.skip(start).take(size).toList();
+    Widget cell(Widget child, int flex) => Expanded(
+      flex: flex,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: child,
       ),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 2,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: doctorBadge('${row['nomorAntrean'] ?? '—'}'),
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  row['jenisAntrean'] == 'WALK_IN'
-                      ? 'Walk-in'
-                      : row['jenisAntrean'] == 'JANJI_TEMU'
-                      ? 'Janji temu'
-                      : 'Antrean',
-                  style: const TextStyle(fontSize: 12),
+    );
+    Widget number(Json row) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: DoctorStyle.paleBlue,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        '${row['nomorAntrean'] ?? '—'}',
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w800,
+          color: DoctorStyle.ink,
+          fontFeatures: [FontFeature.tabularFigures()],
+        ),
+      ),
+    );
+    Widget kind(Json row) => Row(
+      children: [
+        const DoctorIconTile(icon: Icons.person_outline_rounded, size: 28),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                row['jenisAntrean'] == 'WALK_IN'
+                    ? 'Walk-in'
+                    : row['jenisAntrean'] == 'JANJI_TEMU'
+                    ? 'Janji temu'
+                    : 'Antrean',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: DoctorStyle.ink,
                 ),
+              ),
+              if (doctorTime(row, widget.config) != '—')
                 Text(
                   doctorTime(row, widget.config),
                   style: const TextStyle(
@@ -813,49 +966,221 @@ class _DoctorQueuePanelState extends State<DoctorQueuePanel> {
                     color: QueueBStyle.muted,
                   ),
                 ),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label(object(row['poliklinik'])),
-                  style: const TextStyle(fontSize: 12),
+              if (row['layakDipanggil'] == false)
+                const Text(
+                  'Belum layak dipanggil',
+                  style: TextStyle(fontSize: 11, color: QueueBStyle.warning),
                 ),
-                Text(
-                  '${object(row['ruang'])['kode'] ?? label(object(row['ruang']))}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: QueueBStyle.muted,
+            ],
+          ),
+        ),
+      ],
+    );
+    Widget service(Json row) => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label(object(row['poliklinik'])),
+          style: const TextStyle(fontSize: 13, color: DoctorStyle.ink),
+        ),
+        Text(
+          '${object(row['ruang'])['kode'] ?? label(object(row['ruang']))}',
+          style: const TextStyle(fontSize: 11, color: QueueBStyle.muted),
+        ),
+      ],
+    );
+    Widget state(Json row) => Align(
+      alignment: Alignment.centerLeft,
+      child: DoctorStatusPill(
+        label: doctorStatus(row['status']),
+        color: doctorStatusColor(row['status']),
+        icon: row['status'] == 'MENUNGGU'
+            ? Icons.schedule_rounded
+            : row['status'] == 'SELESAI'
+            ? Icons.check_circle_outline_rounded
+            : Icons.circle,
+      ),
+    );
+    Widget menu(Json row) => SizedBox(
+      width: 36,
+      child: PopupMenuButton<String>(
+        tooltip: 'Detail antrean ${row['nomorAntrean']}',
+        onSelected: (_) => showDoctorQueueDetail(context, row, widget.config),
+        itemBuilder: (_) => [
+          const PopupMenuItem(value: 'detail', child: Text('Detail antrean')),
+        ],
+        icon: const Icon(
+          Icons.more_horiz_rounded,
+          size: 21,
+          color: QueueBStyle.muted,
+        ),
+      ),
+    );
+    final list = shown.isEmpty
+        ? Center(
+            child: Text(
+              !widget.available
+                  ? widget.loading
+                        ? 'Memuat data antrean…'
+                        : 'Data antrean belum tersedia.'
+                  : 'Belum ada antrean yang sesuai.',
+              style: const TextStyle(fontSize: 13, color: QueueBStyle.muted),
+            ),
+          )
+        : ListView.separated(
+            primary: false,
+            padding: EdgeInsets.zero,
+            itemCount: shown.length,
+            separatorBuilder: (_, i) => const SizedBox(height: 4),
+            itemBuilder: (context, i) {
+              final row = shown[i],
+                  active = [
+                    'DIPANGGIL',
+                    'DILAYANI',
+                  ].contains(shown[i]['status']);
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
+                decoration: BoxDecoration(
+                  color: active ? DoctorStyle.paleBlue : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: DoctorStyle.rule.withValues(alpha: .8),
                   ),
                 ),
-              ],
+                child: wide
+                    ? Row(
+                        children: [
+                          cell(number(row), 20),
+                          cell(kind(row), 29),
+                          cell(service(row), 28),
+                          cell(state(row), 23),
+                          menu(row),
+                        ],
+                      )
+                    : Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                number(row),
+                                const SizedBox(width: 10),
+                                Expanded(child: state(row)),
+                                menu(row),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            kind(row),
+                            const SizedBox(height: 6),
+                            service(row),
+                          ],
+                        ),
+                      ),
+              );
+            },
+          );
+    final caption = Text(
+      !widget.available
+          ? 'Data belum tersedia'
+          : filtered.isEmpty
+          ? 'Menampilkan 0 antrean'
+          : 'Menampilkan ${start + 1}–${start + shown.length} dari ${filtered.length} antrean',
+      style: const TextStyle(fontSize: 11, color: QueueBStyle.muted),
+    );
+    final pagination = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          tooltip: 'Antrean sebelumnya',
+          onPressed: page == 0 ? null : () => setState(() => page--),
+          icon: const Icon(Icons.chevron_left_rounded),
+        ),
+        for (
+          var index = math.max(0, page - 1);
+          index <= math.min(pages - 1, page + 1);
+          index++
+        )
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: SizedBox(
+              width: 36,
+              child: index == page
+                  ? FilledButton(
+                      style: FilledButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        backgroundColor: DoctorStyle.primary,
+                      ),
+                      onPressed: () {},
+                      child: Text('${index + 1}'),
+                    )
+                  : OutlinedButton(
+                      style: OutlinedButton.styleFrom(padding: EdgeInsets.zero),
+                      onPressed: () => setState(() => page = index),
+                      child: Text('${index + 1}'),
+                    ),
             ),
           ),
-          Expanded(
-            flex: 2,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: doctorBadge(
-                doctorStatus(row['status']),
-                color: doctorStatusColor(row['status']),
+        IconButton(
+          tooltip: 'Antrean berikutnya',
+          onPressed: page + 1 >= pages ? null : () => setState(() => page++),
+          icon: const Icon(Icons.chevron_right_rounded),
+        ),
+      ],
+    );
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (wide)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            margin: const EdgeInsets.only(bottom: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xfff5f7fc),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: DefaultTextStyle(
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: QueueBStyle.muted,
+              ),
+              child: Row(
+                children: [
+                  cell(const Text('No. Antrean'), 20),
+                  cell(const Text('Kunjungan'), 29),
+                  cell(const Text('Layanan / Ruang'), 28),
+                  cell(const Text('Status'), 23),
+                  const SizedBox(width: 36),
+                ],
               ),
             ),
           ),
-          SizedBox(
-            width: 60,
-            child: TextButton(
-              onPressed: () =>
-                  showDoctorQueueDetail(context, row, widget.config),
-              child: const Text('Lihat'),
-            ),
+        Expanded(child: list),
+        const SizedBox(height: 6),
+        if (box.maxWidth < 440 || scale > 1.35)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              caption,
+              Align(alignment: Alignment.centerRight, child: pagination),
+            ],
+          )
+        else
+          Row(
+            children: [
+              Expanded(child: caption),
+              pagination,
+            ],
           ),
-        ],
-      ),
+      ],
     );
+    final minimum = 145 * scale;
+    return box.maxHeight < minimum
+        ? SingleChildScrollView(
+            child: SizedBox(height: minimum, child: content),
+          )
+        : content;
   }
 }
 
@@ -867,10 +1192,12 @@ class DoctorLivePanel extends StatefulWidget {
     required this.available,
     required this.loading,
     required this.status,
+    this.expand = false,
+    this.compact = false,
   });
   final DoctorDashboardData data;
   final AppConfig config;
-  final bool available, loading;
+  final bool available, loading, expand, compact;
   final ValueListenable<String> status;
   @override
   State<DoctorLivePanel> createState() => _DoctorLivePanelState();
@@ -887,185 +1214,319 @@ class _DoctorLivePanelState extends State<DoctorLivePanel> {
             .firstOrNull ??
         active.firstOrNull;
     final next = widget.available ? widget.data.nextEligible : null;
+    final compact = widget.compact;
+    Widget fact(IconData icon, String title, String value) => Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: DoctorStyle.liveMuted, size: compact ? 20 : 24),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: DoctorStyle.liveMuted,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: compact ? 13 : 15,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+    final card = Container(
+      padding: EdgeInsets.all(compact ? 10 : 14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: .18)),
+      ),
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final identity = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                decoration: BoxDecoration(
+                  color: ticket == null
+                      ? const Color(0xffe7edff)
+                      : ticket['status'] == 'DILAYANI'
+                      ? const Color(0xffd9f8e7)
+                      : const Color(0xffe5eeff),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.circle,
+                      size: 8,
+                      color: ticket?['status'] == 'DILAYANI'
+                          ? QueueBStyle.success
+                          : DoctorStyle.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        ticket == null
+                            ? (widget.available
+                                  ? 'Belum ada antrean aktif'
+                                  : 'Antrean live belum tersedia')
+                            : doctorStatus(ticket['status']),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: ticket?['status'] == 'DILAYANI'
+                              ? QueueBStyle.success
+                              : DoctorStyle.ink,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${ticket?['nomorAntrean'] ?? '—'}',
+                style: TextStyle(
+                  fontSize: compact ? 44 : 60,
+                  height: 1.05,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -1,
+                  color: Colors.white,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                ticket == null
+                    ? widget.loading
+                          ? 'Memuat antrean…'
+                          : widget.available
+                          ? 'Belum ada nomor dipanggil.'
+                          : 'Monitoring tersedia saat sesi praktik aktif.'
+                    : '${object(ticket['ruang'])['kode'] ?? label(object(ticket['ruang']))} · ${ticket['jenisAntrean'] == 'WALK_IN'
+                          ? 'Walk-in'
+                          : ticket['jenisAntrean'] == 'JANJI_TEMU'
+                          ? 'Janji temu'
+                          : 'Antrean'}',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: DoctorStyle.liveMuted,
+                ),
+              ),
+            ],
+          );
+          final metadata = Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              fact(
+                Icons.medical_services_outlined,
+                'Layanan',
+                ticket == null ? '—' : label(object(ticket['poliklinik'])),
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Divider(height: 1, color: Colors.white24),
+              ),
+              fact(
+                Icons.access_time_rounded,
+                'Slot konsultasi',
+                ticket == null ? '—' : doctorTime(ticket, widget.config),
+              ),
+            ],
+          );
+          return box.maxWidth >= 330 &&
+                  MediaQuery.textScalerOf(context).scale(14) <= 18
+              ? Row(
+                  children: [
+                    Expanded(flex: 6, child: identity),
+                    Container(
+                      width: 1,
+                      height: 90,
+                      color: Colors.white24,
+                      margin: const EdgeInsets.symmetric(horizontal: 12),
+                    ),
+                    Expanded(flex: 5, child: metadata),
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    identity,
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Divider(height: 1, color: Colors.white24),
+                    ),
+                    metadata,
+                  ],
+                );
+        },
+      ),
+    );
+    final body = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (active.length > 1)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final row in active)
+                  ChoiceChip(
+                    label: Text('${row['nomorAntrean']}'),
+                    selected: identical(row, ticket),
+                    showCheckmark: false,
+                    onSelected: (_) =>
+                        setState(() => selected = DoctorDashboardData.key(row)),
+                  ),
+              ],
+            ),
+          ),
+        card,
+      ],
+    );
     return Container(
-      padding: const EdgeInsets.all(22),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [DoctorStyle.deepNavy, DoctorStyle.deepTeal],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
+          colors: [Color(0xff214894), Color(0xff0d245c)],
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(DoctorStyle.radius),
       ),
-      child: DefaultTextStyle(
-        style: const TextStyle(color: Colors.white, fontSize: 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Row(
-              children: [
-                Icon(
-                  Icons.connected_tv_outlined,
-                  color: Colors.white,
-                  size: 30,
+      child: Stack(
+        children: [
+          Positioned(
+            top: 0,
+            right: 0,
+            left: 0,
+            height: compact ? 100 : 150,
+            child: Image.asset(
+              'assets/illustrations/staff_stethoscope_banner.png',
+              fit: BoxFit.cover,
+              alignment: Alignment.centerRight,
+              cacheWidth: 1000,
+              excludeFromSemantics: true,
+              errorBuilder: (_, error, stack) => const SizedBox.shrink(),
+            ),
+          ),
+          const Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xaa163777), Color(0xcc0d245c)],
                 ),
-                SizedBox(width: 14),
-                Expanded(
-                  child: Text(
-                    'Pemanggilan Antrean Live',
-                    style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.all(compact ? 12 : 16),
+            child: Column(
+              mainAxisSize: widget.expand ? MainAxisSize.max : MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: .12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.connected_tv_outlined,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Antrean Aktif',
+                        style: TextStyle(
+                          fontSize: compact ? 17 : 20,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    ValueListenableBuilder<String>(
+                      valueListenable: widget.status,
+                      builder: (_, value, child) => Tooltip(
+                        message: value,
+                        child: Icon(
+                          value == 'Realtime terhubung'
+                              ? Icons.wifi_rounded
+                              : Icons.sync_rounded,
+                          color: DoctorStyle.liveMuted,
+                          size: 17,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (widget.expand)
+                  Expanded(child: SingleChildScrollView(child: body))
+                else
+                  body,
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: ticket == null
+                      ? null
+                      : () => showDoctorQueueDetail(
+                          context,
+                          ticket,
+                          widget.config,
+                        ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    disabledForegroundColor: const Color(0xffbac9ed),
+                    side: const BorderSide(color: Colors.white54),
+                    backgroundColor: Colors.white.withValues(alpha: .05),
+                    minimumSize: const Size(44, 40),
+                  ),
+                  icon: const Icon(Icons.visibility_outlined, size: 19),
+                  label: const Text(
+                    'Lihat detail antrean',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  next == null
+                      ? 'Belum ada antrean berikutnya yang layak dipanggil.'
+                      : 'Berikutnya yang layak: ${next['nomorAntrean']}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: DoctorStyle.liveMuted,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            ValueListenableBuilder<String>(
-              valueListenable: widget.status,
-              builder: (context, value, _) => Text(
-                value,
-                style: const TextStyle(
-                  color: DoctorStyle.liveMuted,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              widget.loading ? 'MEMPERBARUI SNAPSHOT' : 'ANTREAN SAAT INI',
-              style: const TextStyle(
-                fontSize: 12,
-                color: DoctorStyle.liveMuted,
-                letterSpacing: 1,
-              ),
-            ),
-            const SizedBox(height: 10),
-            if (ticket == null) ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: .12),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 25,
-                      backgroundColor: Colors.white24,
-                      child: Icon(
-                        Icons.person_outline,
-                        color: Colors.white,
-                        size: 30,
-                      ),
-                    ),
-                    SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '—',
-                            style: TextStyle(
-                              fontSize: 30,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          Text(
-                            'Belum ada antrean',
-                            style: TextStyle(color: DoctorStyle.liveMuted),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                !widget.available
-                    ? 'Monitoring tersedia selama sesi praktik Anda berlangsung pada hari pelayanan.'
-                    : 'Belum ada nomor dipanggil.',
-              ),
-            ] else ...[
-              Text(
-                '${ticket['nomorAntrean']}',
-                style: const TextStyle(
-                  fontSize: 48,
-                  fontWeight: FontWeight.w800,
-                  color: DoctorStyle.liveNumber,
-                ),
-              ),
-              Text(
-                doctorStatus(ticket['status']),
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(label(object(ticket['poliklinik']))),
-              Text(
-                '${object(ticket['ruang'])['kode'] ?? ''} · ${label(object(ticket['ruang']))}',
-              ),
-              if (object(ticket['ruang'])['lokasi'] != null)
-                Text('${object(ticket['ruang'])['lokasi']}'),
-              const SizedBox(height: 10),
-              Text(
-                'Slot: ${doctorTime(ticket, widget.config)} · ${widget.config.serviceTimeZone}',
-                style: const TextStyle(fontSize: 12),
-              ),
-              if (active.length > 1)
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (final row in active)
-                      ActionChip(
-                        label: Text('${row['nomorAntrean']}'),
-                        onPressed: () => setState(
-                          () => selected = DoctorDashboardData.key(row),
-                        ),
-                      ),
-                  ],
-                ),
-              const SizedBox(height: 18),
-              FilledButton.icon(
-                onPressed: () =>
-                    showDoctorQueueDetail(context, ticket, widget.config),
-                icon: const Icon(Icons.visibility_outlined),
-                label: const Text('Lihat detail antrean'),
-              ),
-            ],
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 14),
-              child: Divider(color: Colors.white24),
-            ),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: .1),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Text(
-                next == null
-                    ? 'Belum ada antrean berikutnya yang layak dipanggil pada snapshot.'
-                    : 'Berikutnya yang layak: ${next['nomorAntrean']}',
-                style: const TextStyle(color: DoctorStyle.liveMuted),
-              ),
-            ),
-            const SizedBox(height: 14),
-            const Text(
-              'Pemantauan saja. Pemanggilan, mulai, dan penyelesaian pelayanan dilakukan PETUGAS.',
-              style: TextStyle(fontSize: 12, color: Colors.white70),
-            ),
-            if (widget.available && widget.data.snapshots.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Text(
-                'Snapshot: ${widget.config.instantLabel(widget.data.snapshots.first['diperolehPada'])}',
-                style: const TextStyle(fontSize: 11, color: Colors.white70),
-              ),
-            ],
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

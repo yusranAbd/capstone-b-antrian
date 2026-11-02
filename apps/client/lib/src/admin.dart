@@ -5,15 +5,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'admin_schema.dart';
+import 'service_category.dart';
 import 'admin_display.dart';
 import 'admin_practice_form.dart';
 import 'doctor_account.dart';
 import 'admin_data.dart';
 import 'admin_navigation.dart';
+import 'admin_insights.dart';
 import 'admin_ui.dart';
 import 'admin_dashboard.dart';
+import 'features/insights/insights_cubit.dart';
 import 'admin_schedules.dart';
 import 'admin_staff.dart';
+import 'admin_service_setup.dart';
 import 'api.dart';
 import 'config.dart';
 import 'widgets.dart';
@@ -41,7 +45,7 @@ class AdminPage extends StatefulWidget {
     this.section,
     this.onSection,
     this.routeChild,
-  }) : assert(initialSection >= -1 && initialSection < 8);
+  }) : assert(initialSection >= -1 && initialSection < 10);
   final QueueApi api;
   final int? section;
   final ValueChanged<int>? onSection;
@@ -58,6 +62,7 @@ class _AdminPageState extends State<AdminPage> {
   int staffTab = 0;
   bool collapsed = false;
   late final AdminCatalogRepository catalogRepository;
+  late final InsightsCubit dashboardActivity;
   late final List<AdminCatalogCubit> catalogCubits;
   late final AdminScheduleRepository scheduleRepository;
   late final AdminSlotRepository slotRepository;
@@ -110,17 +115,24 @@ class _AdminPageState extends State<AdminPage> {
   set error(String? value) => _error = value;
   String scheduleSearch = '';
   bool _loading = true;
+  // Navigation is allowed while a read-only page refresh is in progress.
+  // All CRUD actions remain protected by the existing `loading`/busy guards.
+  bool _readingSection = false;
   bool get loading => selected == 7
       ? displayManagement.state.busy
       : masterCubit?.state.busy ?? _loading;
+  bool get navigationLocked =>
+      !catalogRepository.active || (loading && !_readingSection);
   set loading(bool value) => _loading = value;
   int revision = 0;
   int _requestRevision = 0;
+  int _navigationEpoch = 0;
   AdminResource get resource =>
       resources[selected >= 0 && selected < resources.length ? selected : 0];
   @override
   void initState() {
     super.initState();
+    dashboardActivity = InsightsCubit(widget.api);
     catalogRepository = AdminCatalogRepository(widget.api);
     scheduleRepository = AdminScheduleRepository(catalogRepository);
     slotRepository = AdminSlotRepository(catalogRepository);
@@ -154,6 +166,7 @@ class _AdminPageState extends State<AdminPage> {
           _error = null;
           message = null;
           _loading = false;
+          _readingSection = false;
         }
       });
     }
@@ -169,11 +182,16 @@ class _AdminPageState extends State<AdminPage> {
       cubit.close();
     }
     displayManagement.close();
+    dashboardActivity.close();
     catalogRepository.dispose();
     super.dispose();
   }
 
   Future<void> load({bool reloadCatalog = false}) async {
+    if (selected >= 8) {
+      _loading = false;
+      return;
+    }
     if (selected == 7) {
       await displayManagement.refresh();
       return;
@@ -188,6 +206,7 @@ class _AdminPageState extends State<AdminPage> {
     final selectedResource = resource;
     setState(() {
       loading = true;
+      _readingSection = true;
       error = null;
     });
     try {
@@ -204,7 +223,15 @@ class _AdminPageState extends State<AdminPage> {
         await cubit.refresh(paths: paths);
         return;
       }
-      await catalogRepository.refresh(paths);
+      final today = widget.api.config.today;
+      await Future.wait<void>([
+        catalogRepository.refresh(paths),
+        if (selected == -1)
+          dashboardActivity.load('/laporan/operasional', {
+            'mulai': today,
+            'selesai': today,
+          }),
+      ]);
       // A manual page reload refreshes open sessions even if their reference
       // projection is unchanged; dependency invalidations already start a read.
       await Future.wait(
@@ -226,7 +253,10 @@ class _AdminPageState extends State<AdminPage> {
       if (mounted && current == _requestRevision) setState(() => error = '$e');
     } finally {
       if (mounted && current == _requestRevision) {
-        setState(() => loading = false);
+        setState(() {
+          loading = false;
+          _readingSection = false;
+        });
       }
     }
   }
@@ -302,6 +332,139 @@ class _AdminPageState extends State<AdminPage> {
         await load(reloadCatalog: true);
       }
     }
+  }
+
+  /// Each operation uses its existing ADMIN owner and API validation.
+  /// No hidden multi-request POST or automatic publish is performed.
+  Future<void> _runServiceSetupAction(
+    AdminSetupAction action,
+    String? serviceId,
+    String? relatedId,
+  ) async {
+    if (!catalogRepository.active) {
+      throw const ApiException(401, 'Sesi ADMIN tidak berlaku lagi.');
+    }
+    final clinics = catalog['/layanan'] ?? <Json>[];
+    final clinic = clinics.where((r) => r['id'] == serviceId).firstOrNull;
+    if (action != AdminSetupAction.createService && clinic == null) {
+      throw const ApiException(404, 'Layanan tidak tersedia. Muat ulang.');
+    }
+    final resourcesByAction = {
+      AdminSetupAction.createService: 0,
+      AdminSetupAction.editService: 0,
+      AdminSetupAction.addRoom: 2,
+      AdminSetupAction.addSlot: 5,
+    };
+    bool? changed;
+    final index = resourcesByAction[action];
+    if (index != null) {
+      final row = action == AdminSetupAction.editService ? clinic : null;
+      changed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => _AdminEditor(
+          api: widget.api,
+          resource: resources[index],
+          catalog: catalog,
+          row: row,
+          initialValues: action == AdminSetupAction.addRoom
+              ? {'layananId': serviceId!}
+              : const {},
+          initialSession: action == AdminSetupAction.addSlot ? relatedId : null,
+          onSave: index == 5
+              ? (body) => slotsById('${body['jadwalPraktikId']}').save(body)
+              : (body) =>
+                    catalogCubits[index].save(body, id: row?['id'] as String?),
+        ),
+      );
+    } else if (action == AdminSetupAction.addHours) {
+      changed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => BulkScheduleEditor(
+          api: widget.api,
+          clinics: clinics,
+          repository: scheduleRepository,
+          initialClinicId: serviceId,
+        ),
+      );
+    } else if (action == AdminSetupAction.createDoctor) {
+      changed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AdminDoctorEditor(
+          api: widget.api,
+          saveProfile: (id, body) =>
+              (catalogCubits[1] as DoctorCatalogCubit).save(body, id: id),
+        ),
+      );
+    } else if (action == AdminSetupAction.linkDoctor) {
+      final doctor = (catalog['/dokter'] ?? <Json>[])
+          .where((r) => r['id'] == relatedId)
+          .firstOrNull;
+      if (doctor == null) {
+        throw const ApiException(404, 'Profil dokter tidak ditemukan.');
+      }
+      await showDialog<void>(
+        context: context,
+        builder: (_) => _DoctorLinks(
+          api: widget.api,
+          doctor: doctor,
+          services: clinics,
+          initialServiceId: serviceId,
+        ),
+      );
+      // The link dialog handles its own writes. Reconcile even if dismissed.
+      await catalogRepository.refresh(['/dokter', '/layanan']);
+      return;
+    } else if (action == AdminSetupAction.addPractice) {
+      changed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => PracticeScheduleEditor(
+          api: widget.api,
+          catalog: catalog,
+          catalogSource: catalogRepository,
+          initialClinicId: serviceId,
+          onSave: (body) =>
+              (catalogCubits[4] as PracticeScheduleCubit).save(body),
+        ),
+      );
+    }
+    if (changed == true && catalogRepository.active) {
+      await catalogRepository.refresh([
+        '/layanan',
+        '/dokter',
+        '/loket',
+        '/jadwal-layanan',
+        '/jadwal-praktik',
+      ]);
+    }
+  }
+
+  Future<void> openIntegratedServiceSetup() async {
+    if (navigationLocked || !catalogRepository.active) return;
+    try {
+      await catalogRepository.refresh([
+        '/layanan',
+        '/dokter',
+        '/loket',
+        '/jadwal-layanan',
+        '/jadwal-praktik',
+      ]);
+    } catch (e) {
+      if (mounted) setState(() => error = '$e');
+      return;
+    }
+    if (!mounted || !catalogRepository.active) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AdminServiceSetup(
+        repository: catalogRepository,
+        onAction: _runServiceSetupAction,
+      ),
+    );
   }
 
   Future<void> deleteRow(Json row) async {
@@ -418,17 +581,38 @@ class _AdminPageState extends State<AdminPage> {
       '${label(object(row['petugas']))} · ${label(object(row['loket']))}\n${dateOnly(row['tanggalMulai'])} → ${row['tanggalSelesai'] == null ? 'Tanpa akhir' : dateOnly(row['tanggalSelesai'])}',
     _ => '${label(object(row['layanan']))} · ${row['lokasi'] ?? ''}',
   };
+  // Allow the new route and sidebar selection to paint before starting
+  // network reads. Rapid navigation in the same frame loads only the last
+  // selected resource; no request or business mutation runs from animation.
+  void _scheduleSectionRead() {
+    final epoch = ++_navigationEpoch;
+    final target = selected;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || epoch != _navigationEpoch || selected != target) return;
+      load();
+    });
+  }
+
   @override
   void didUpdateWidget(covariant AdminPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.section != oldWidget.section) {
       message = null;
       error = null;
-      if (selected != 7) load();
+      if (selected >= 7) {
+        // Do not let an old page read change the DISPLAY loading indicator.
+        _navigationEpoch++;
+        _requestRevision++;
+        _readingSection = false;
+        _loading = false;
+      } else {
+        _scheduleSectionRead();
+      }
     }
   }
 
   void selectResource(int value) {
+    if (value == selected) return;
     if (widget.onSection case final navigate?) {
       navigate(value);
       return;
@@ -437,8 +621,14 @@ class _AdminPageState extends State<AdminPage> {
       _selected = value;
       message = null;
       error = null;
+      if (value >= 7) {
+        _navigationEpoch++;
+        _requestRevision++;
+        _readingSection = false;
+        _loading = false;
+      }
     });
-    if (value != 7) load();
+    if (value < 7) _scheduleSectionRead();
   }
 
   Future<void> openMenu() async {
@@ -457,7 +647,7 @@ class _AdminPageState extends State<AdminPage> {
                     Navigator.pop(sheetContext);
                     widget.onProfile!();
                   },
-            onSelect: loading
+            onSelect: navigationLocked
                 ? null
                 : (value) {
                     Navigator.pop(sheetContext);
@@ -510,6 +700,12 @@ class _AdminPageState extends State<AdminPage> {
 
   Widget _buildContent(BuildContext context) {
     final toolbarActions = <Widget>[
+      if (selected == 0)
+        OutlinedButton.icon(
+          onPressed: navigationLocked ? null : openIntegratedServiceSetup,
+          icon: const Icon(Icons.account_tree_outlined, size: 18),
+          label: const Text('Kelola Terpadu'),
+        ),
       FilledButton.icon(
         onPressed: loading ? null : () => edit(),
         icon: const Icon(Icons.add, size: 18),
@@ -521,62 +717,61 @@ class _AdminPageState extends State<AdminPage> {
         label: const Text('Muat ulang'),
       ),
     ];
-    final content = selected == 7
+    final content = selected >= 8
+        ? AdminInsightsPage(
+            key: ValueKey(selected),
+            api: widget.api,
+            catalog: catalogRepository,
+            audit: selected == 9,
+          )
+        : selected == 7
         ? AdminDisplayPage(api: widget.api, cubit: displayManagement)
         : selected == -1
-        ? ListView(
-            padding: const EdgeInsets.all(AdminStyle.pagePadding),
-            children: [
-              SizedBox(
-                height: loading ? 4 : 0,
-                child: loading ? const LinearProgressIndicator() : null,
-              ),
-              error != null
-                  ? AdminNotice(error!, error: true)
-                  : const SizedBox.shrink(),
-              AdminDashboard(
-                administratorName: widget.api.user?['nama'] as String?,
-                onRefresh: () => load(reloadCatalog: true),
-                catalog: catalog,
-                config: widget.api.config,
-                loading: loading,
-                onSelect: selectResource,
-              ),
-            ],
+        ? BlocBuilder<InsightsCubit, InsightsState>(
+            bloc: dashboardActivity,
+            builder: (context, activity) => AdminDashboard(
+              administratorName: widget.api.user?['nama'] as String?,
+              onRefresh: () => load(reloadCatalog: true),
+              onSetup: openIntegratedServiceSetup,
+              catalog: catalog,
+              config: widget.api.config,
+              loading: loading,
+              error: error,
+              activity: activity.data,
+              activityLoading: activity.loading,
+              activityError: activity.error,
+              onSelect: selectResource,
+            ),
           )
         : ListView(
-            padding: const EdgeInsets.all(AdminStyle.pagePadding),
+            padding: AdminStyle.pageInsets(context),
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      resource.title,
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                  ),
-                  if (selected == 1)
-                    TextButton.icon(
-                      icon: const Icon(Icons.help_outline, size: 18),
-                      label: const Text('Panduan dokter'),
-                      onPressed: () => showDialog<void>(
-                        context: context,
-                        builder: (c) => AlertDialog(
-                          title: const Text('Pengelolaan dokter'),
-                          content: const Text(
-                            '1. Buat profil → 2. Hubungkan poliklinik → 3. Buat akun login.\n\nStatus profil dan akun login dikelola terpisah; profil nonaktif tidak dapat mengakses portal.',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(c),
-                              child: const Text('Mengerti'),
+              AdminPageHeading(
+                title: resource.title,
+                subtitle: adminSectionDescription(selected),
+                trailing: selected == 1
+                    ? TextButton.icon(
+                        icon: const Icon(Icons.help_outline, size: 18),
+                        label: const Text('Panduan dokter'),
+                        onPressed: () => showDialog<void>(
+                          context: context,
+                          builder: (c) => AlertDialog(
+                            title: const Text('Pengelolaan dokter'),
+                            content: const Text(
+                              '1. Buat profil → 2. Hubungkan poliklinik → 3. Buat akun login.\n\nStatus profil dan akun login dikelola terpisah; profil nonaktif tidak dapat mengakses portal.',
                             ),
-                          ],
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(c),
+                                child: const Text('Mengerti'),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ),
-                ],
+                      )
+                    : null,
               ),
+              const SizedBox(height: 8),
               error != null
                   ? AdminNotice(error!, error: true)
                   : const SizedBox.shrink(),
@@ -585,10 +780,10 @@ class _AdminPageState extends State<AdminPage> {
                   QueueBMicroEntrance(
                     key: const ValueKey('admin-crud-feedback'),
                     once: event,
-                    child: AdminNotice(message!),
+                    child: AdminNotice(message!, success: true),
                   )
                 else
-                  AdminNotice(message!),
+                  AdminNotice(message!, success: true),
               if (selected == 6) ...[
                 const SizedBox(height: 8),
                 TabBar(
@@ -672,13 +867,13 @@ class _AdminPageState extends State<AdminPage> {
                 ? Row(
                     children: [
                       SizedBox(
-                        width: collapsed ? 64 : 216,
+                        width: collapsed ? 72 : 232,
                         child: Material(
                           color: Colors.white,
                           child: AdminNavigation(
                             selected: selected,
                             onProfile: widget.onProfile,
-                            onSelect: loading ? null : selectResource,
+                            onSelect: navigationLocked ? null : selectResource,
                             collapsed: collapsed,
                             onToggle: () =>
                                 setState(() => collapsed = !collapsed),
@@ -698,7 +893,7 @@ class _AdminPageState extends State<AdminPage> {
                             Tooltip(
                               message: 'Menu administrasi',
                               child: OutlinedButton.icon(
-                                onPressed: loading ? null : openMenu,
+                                onPressed: navigationLocked ? null : openMenu,
                                 icon: const Icon(Icons.menu),
                                 label: Text(
                                   box.maxWidth < 375
@@ -710,11 +905,7 @@ class _AdminPageState extends State<AdminPage> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
-                                selected == -1
-                                    ? 'Dashboard'
-                                    : selected == 7
-                                    ? 'Manajemen Display'
-                                    : resource.title,
+                                adminSectionTitle(selected),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -760,8 +951,10 @@ class _AdminEditor extends StatefulWidget {
     this.initialSession,
     this.onSave,
     this.catalogSource,
+    this.initialValues = const {},
   });
   final QueueApi api;
+  final Map<String, String> initialValues;
   final Future<Json> Function(Json)? onSave;
   final AdminCatalogRepository? catalogSource;
   final AdminResource resource;
@@ -788,7 +981,12 @@ class _AdminEditorState extends State<_AdminEditor> {
   void initState() {
     super.initState();
     for (final f in fields) {
-      final v = widget.row?[f.key];
+      final v =
+          widget.initialValues[f.key] ??
+          widget.row?[f.key] ??
+          (f.key == 'kategori' && widget.row != null
+              ? serviceCategory(widget.row!)
+              : null);
       values[f.key] = v == null
           ? f.key == 'jadwalPraktikId'
                 ? widget.initialSession ?? ''
@@ -805,7 +1003,16 @@ class _AdminEditorState extends State<_AdminEditor> {
 
   List<(String, String)> options(AdminField field) {
     if (field.options.isNotEmpty) {
-      return field.options.map((v) => (v, v.replaceAll('_', ' '))).toList();
+      return field.options
+          .map(
+            (v) => (
+              v,
+              field.key == 'kategori'
+                  ? serviceCategoryLabels[v] ?? v
+                  : v.replaceAll('_', ' '),
+            ),
+          )
+          .toList();
     }
     if (field.key == 'layananId') {
       return choicesOf(catalog['/layanan'] ?? []);
@@ -1142,10 +1349,12 @@ class _DoctorLinks extends StatefulWidget {
     required this.api,
     required this.doctor,
     required this.services,
+    this.initialServiceId,
   });
   final QueueApi api;
   final Json doctor;
   final List<Json> services;
+  final String? initialServiceId;
   @override
   State<_DoctorLinks> createState() => _DoctorLinksState();
 }
@@ -1158,6 +1367,12 @@ class _DoctorLinksState extends State<_DoctorLinks> {
   void initState() {
     super.initState();
     links = rows(widget.doctor['dokterLayanan']);
+    service =
+        widget.services.any(
+          (r) => r['id'] == widget.initialServiceId && r['aktif'] == true,
+        )
+        ? widget.initialServiceId
+        : null;
   }
 
   Future<void> mutate([String? remove]) async {
@@ -1173,7 +1388,12 @@ class _DoctorLinksState extends State<_DoctorLinks> {
         body: remove == null ? {'layananId': service} : null,
       );
       final result = rows(await widget.api.request('GET', path));
-      if (mounted) setState(() => links = result);
+      if (mounted) {
+        setState(() {
+          links = result;
+          if (remove == null) service = null;
+        });
+      }
     } catch (e) {
       if (mounted) setState(() => error = '$e');
     } finally {

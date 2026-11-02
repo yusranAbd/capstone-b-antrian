@@ -11,3 +11,14 @@ int patientBottomIndex(int tab) => switch (tab) {
   5 => 3,
   _ => 0,
 };
+
+/// Retire the duplicate service catalog while preserving supported booking URLs.
+/// Explicit clinic links still open service details; doctor/nearest routes remain.
+String? patientBookingRedirect(Uri uri) {
+  final clinic = uri.queryParameters['clinic'];
+  if (clinic != null && clinic.trim().isNotEmpty) return null;
+  if (const {'doctors', 'nearest'}.contains(uri.queryParameters['mode'])) {
+    return null;
+  }
+  return '/patient/reservations';
+}

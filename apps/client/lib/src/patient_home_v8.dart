@@ -71,6 +71,126 @@ String patientServiceHours(
       : (times.toSet().toList()..sort()).join(', ');
 }
 
+/// Reads the existing doctor-to-service association and practice schedule.
+/// This is a display-only label, not proof that a PETUGAS account is assigned.
+/// Never substitute a doctor from a different service or another day.
+String? patientServiceScheduledProviderName({
+  required List<Json> doctors,
+  required List<Json> sessions,
+  required String serviceId,
+  required String date,
+}) {
+  final names = <String>{};
+  for (final doctor in doctors) {
+    if (doctor['aktif'] == false) continue;
+    final doctorId = '${doctor['id'] ?? ''}'.trim();
+    if (doctorId.isEmpty) continue;
+    final links = rows(doctor['dokterLayanan'])
+        .where(
+          (link) =>
+              link['aktif'] == true &&
+              (link['layananId'] ?? object(link['layanan'])['id']) == serviceId,
+        )
+        .toList();
+    if (links.isEmpty) continue;
+
+    final scheduled = sessions.any((session) {
+      if (session['aktif'] == false ||
+          object(session['loket'])['aktif'] == false ||
+          dateOnly(session['tanggal']) != date) {
+        return false;
+      }
+      final pair = object(session['dokterLayanan']);
+      final providerId = pair['dokterId'] ?? object(pair['dokter'])['id'];
+      if (providerId != doctorId) return false;
+      final scheduledService =
+          pair['layananId'] ?? object(pair['layanan'])['id'];
+      if (scheduledService != null && scheduledService != serviceId) {
+        return false;
+      }
+      final pairId = session['dokterLayananId'] ?? pair['id'];
+      if (pairId != null) {
+        return links.any((link) => link['id'] == pairId);
+      }
+      // When the schedule does not expose an association ID, accept the
+      // explicit service ID, or an unambiguous single active association.
+      return scheduledService == serviceId ||
+          rows(doctor['dokterLayanan'])
+                  .where((l) => l['aktif'] == true)
+                  .length ==
+              1;
+    });
+    if (!scheduled) continue;
+
+    final fullName = label(doctor).trim().replaceFirst(
+      RegExp(r'^(?:(?:drg?|apt|prof|dokter)\.?\s+)+', caseSensitive: false),
+      '',
+    );
+    if (fullName.isEmpty) continue;
+    final firstName = fullName.split(RegExp(r'\s+')).first.replaceAll(',', '');
+    if (firstName.isNotEmpty) names.add(firstName);
+  }
+  if (names.isEmpty) return null;
+  final ordered = names.toList()..sort();
+  return ordered.length == 1
+      ? ordered.first
+      : '${ordered.first} +${ordered.length - 1}';
+}
+
+/// Fallback for a service with no matching practice session on the selected
+/// day. A linked doctor is NOT evidence of an on-duty shift. No cross-service
+/// matching and no fabricated names.
+String? patientServiceLinkedProviderName({
+  required List<Json> doctors,
+  required String serviceId,
+}) {
+  final names = <String>{};
+  for (final doctor in doctors) {
+    if (doctor['aktif'] == false) continue;
+    final links = rows(doctor['dokterLayanan']);
+    if (!links.any(
+      (link) =>
+          link['aktif'] != false &&
+          (link['layananId'] ?? object(link['layanan'])['id']) == serviceId,
+    )) {
+      continue;
+    }
+    final fullName = label(doctor).trim().replaceFirst(
+      RegExp(r'^(?:(?:drg?|apt|prof|dokter)\.?\s+)+', caseSensitive: false),
+      '',
+    );
+    final first = fullName.split(RegExp(r'\s+')).first.replaceAll(',', '');
+    if (first.isNotEmpty) names.add(first);
+  }
+  if (names.isEmpty) return null;
+  final sorted = names.toList()..sort();
+  return sorted.length == 1
+      ? sorted.first
+      : '${sorted.first} +${sorted.length - 1}';
+}
+
+/// Compact doctor name for the ticket card, preferring today's practice session
+/// before the active doctor-service link. Neither implies an active PETUGAS.
+String patientServiceProviderLabel({
+  required List<Json> doctors,
+  required List<Json> sessions,
+  required String serviceId,
+  required String date,
+}) {
+  final scheduled = patientServiceScheduledProviderName(
+    doctors: doctors,
+    sessions: sessions,
+    serviceId: serviceId,
+    date: date,
+  );
+  if (scheduled != null) return scheduled;
+  final linked = patientServiceLinkedProviderName(
+    doctors: doctors,
+    serviceId: serviceId,
+  );
+  return linked ?? '';
+}
+
 /// A single physical paper contour is shared by shadow, clipping and border.
 /// The cutouts are actual holes, including hit testing; no background circles.
 class PatientTicketClipper extends CustomClipper<Path> {
@@ -139,12 +259,14 @@ class PatientServiceTicketV8 extends StatefulWidget {
     this.ticket,
     this.queue,
     this.hours = 'Jam belum tersedia',
+    this.staffName,
     this.onTap,
   });
   final Json clinic;
   final Json? ticket;
   final PatientQueueView? queue;
   final String hours;
+  final String? staffName;
   final VoidCallback? onTap;
   @override
   State<PatientServiceTicketV8> createState() => _PatientServiceTicketV8State();
@@ -178,9 +300,10 @@ class _PatientServiceTicketV8State extends State<PatientServiceTicketV8> {
         ? 'Belum ada pelayanan aktif'
         : servingValue!;
     final number = '${widget.ticket?['nomorAntrean'] ?? ''}'.trim();
-    final metadata = widget.hours == 'Jam belum tersedia'
-        ? 'Jam & petugas belum tersedia'
-        : '${widget.hours} · Petugas belum tersedia';
+    final staff = widget.staffName?.trim();
+    final metadata = staff == null || staff.isEmpty
+        ? widget.hours
+        : '${widget.hours} · $staff';
     final queueSemantics = summary == null
         ? 'Informasi antrean yang sedang dilayani belum tersedia. Total check-in hari ini dan jumlah menunggu belum tersedia.'
         : 'Sedang dilayani: $serving. Total check-in hari ini ${summary.checkedInTotal ?? 'belum tersedia'}. ${summary.waitingCount == null ? 'Jumlah menunggu belum tersedia' : '${summary.waitingCount} menunggu'}. ${queue.freshness}.';
@@ -318,6 +441,8 @@ class _PatientServiceTicketV8State extends State<PatientServiceTicketV8> {
                                             const SizedBox(height: 4),
                                             Text(
                                               metadata,
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
                                               style: const TextStyle(
                                                 fontSize: 11.5,
                                                 height: 1.3,

@@ -615,7 +615,7 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(AlertDialog),
-          matching: find.text('Tiket QA-001'),
+          matching: find.text('QA-001'),
         ),
         findsOneWidget,
       );

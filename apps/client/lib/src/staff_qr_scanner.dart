@@ -182,8 +182,7 @@ class _StaffQrScannerState extends State<StaffQrScanner>
               const SizedBox(height: 12),
               if (processing) const LinearProgressIndicator(),
               if (result != null) StaffScanResult(result: result!),
-              if (error != null)
-                Text(error!, style: const TextStyle(color: QueueBStyle.danger)),
+              if (error != null) MobileNotice(error!, error: true),
               const SizedBox(height: 8),
               const Text(
                 'Arahkan ke QR pasien berikutnya. QR yang sama tidak dikirim berulang.',

@@ -16,6 +16,7 @@ import 'api.dart';
 import 'admin_ui.dart';
 import 'config.dart';
 import 'widgets.dart';
+import 'queueb_feedback.dart';
 
 class AdminDisplayPage extends StatefulWidget {
   const AdminDisplayPage({super.key, required this.api, this.cubit});
@@ -165,9 +166,7 @@ class _AdminDisplayPageState extends State<AdminDisplayPage> {
     }
     if (result == AdminDeleteResult.deleted) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Perangkat berhasil dihapus permanen.')),
-        );
+        QueueBFeedback.success(context, 'Perangkat berhasil dihapus permanen.');
       }
     }
   }

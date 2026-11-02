@@ -8,7 +8,6 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:queueb_client/src/api.dart';
 import 'package:queueb_client/src/app.dart';
 import 'package:queueb_client/src/config.dart';
-import 'package:queueb_client/src/mobile_ui.dart';
 import 'package:queueb_client/src/patient_ui.dart';
 
 import 'doctor_schedule_test.dart' show DoctorBackend;
@@ -125,16 +124,16 @@ void main() {
 
   Future<void> clinic(WidgetTester tester) async {
     await openPatientCatalog(tester);
-    await press(tester, find.byType(ClinicCard).first);
   }
 
   Future<void> review(WidgetTester tester) async {
     await clinic(tester);
     await press(tester, find.text('Lihat Detail Dokter'));
-    await press(tester, find.text('Buat Janji Temu'));
-    await press(tester, find.text('Lihat slot'));
     await press(tester, find.text('Sisa slot 2'));
-    await press(tester, find.widgetWithText(FilledButton, 'Lanjutkan'));
+    await press(
+      tester,
+      find.widgetWithText(FilledButton, 'Lanjutkan Reservasi'),
+    );
   }
 
   Iterable<(String, String, Json)> bookings(PatientV2Backend backend) =>
@@ -209,7 +208,10 @@ void main() {
           find.descendant(of: dialog, matching: find.text('Poli Umum')),
           findsOneWidget,
         );
-        expect(find.text('RU · Ruang Umum'), findsOneWidget);
+        expect(
+          find.descendant(of: dialog, matching: find.text('RU · Ruang Umum')),
+          findsOneWidget,
+        );
         expect(find.textContaining('Asia/Jakarta'), findsWidgets);
         expect(find.text('UM-001'), findsNothing);
         await press(
@@ -233,16 +235,9 @@ void main() {
       final backend = PatientV2Backend()..walkOnly = true;
       await launch(tester, backend);
       await openPatientCatalog(tester);
-      await press(tester, find.byType(ClinicCard).first);
       await press(tester, find.text('Lihat Detail Dokter'));
-      expect(
-        tester
-            .widget<FilledButton>(
-              find.widgetWithText(FilledButton, 'Buat Janji Temu'),
-            )
-            .onPressed,
-        isNull,
-      );
+      expect(find.text('Lanjutkan Reservasi'), findsNothing);
+      expect(find.text('Daftar antrean poliklinik'), findsOneWidget);
       await press(tester, find.byTooltip('Kembali'));
       await press(tester, find.text('Reservasi walk-in'));
       await press(tester, find.text('Lanjutkan'));
@@ -267,7 +262,9 @@ void main() {
     expect(bookings(backend), isEmpty);
     expect(
       tester
-          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Lanjutkan'))
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Lanjutkan Reservasi'),
+          )
           .onPressed,
       isNotNull,
     );
@@ -321,10 +318,10 @@ void main() {
     await tester.ensureVisible(find.text('Kunjungan Terdekat'));
     expect(find.text('Kunjungan Terdekat'), findsOneWidget);
     await press(tester, find.text('Lihat Detail'));
-    expect(find.text('Tiket UM-001'), findsOneWidget);
+    expect(find.text('Detail Tiket'), findsOneWidget);
     await press(tester, find.text('Tutup'));
     await openPatientTickets(tester);
-    expect(find.text('Tiket Saya'), findsWidgets);
+    expect(find.text('Reservasi'), findsWidgets);
     expect(find.text('UM-004'), findsOneWidget);
     expect(find.text('UM-001'), findsOneWidget);
   });

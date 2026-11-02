@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'config.dart';
+import 'service_category.dart';
 import 'patient_design.dart';
 import 'user_profile.dart';
 import 'features/patient/models/patient_queue_models.dart';
@@ -20,7 +21,7 @@ enum PatientServiceCategory {
   other,
 }
 
-/// Presentation order for supported auxiliary service codes, never catalog data.
+/// Presentation order for explicit service categories, never catalog data.
 const patientDailyServiceOrder = [
   'PENDAFTARAN',
   'APOTEK',
@@ -30,36 +31,33 @@ const patientDailyServiceOrder = [
   'REKAM_MEDIS',
 ];
 
-PatientServiceCategory homeServiceCategory(
-  Json clinic,
-) => switch ('${clinic['kode'] ?? ''}'.trim().toUpperCase()) {
-  'PENDAFTARAN' ||
-  'REGISTRASI' ||
-  'ADMINISTRASI' => PatientServiceCategory.registration,
-  'APOTEK' || 'APOTIK' => PatientServiceCategory.pharmacy,
-  'LABORATORIUM' => PatientServiceCategory.laboratory,
-  'RADIOLOGI' => PatientServiceCategory.radiology,
-  'KASIR' => PatientServiceCategory.billing,
-  'REKAM_MEDIS' => PatientServiceCategory.medicalRecords,
-  'UMUM' || 'POLI_UMUM' || 'POLIKLINIK_UMUM' => PatientServiceCategory.general,
-  'GIGI' || 'POLI_GIGI' || 'POLIKLINIK_GIGI' => PatientServiceCategory.dental,
-  _ => PatientServiceCategory.other,
-};
+PatientServiceCategory homeServiceCategory(Json clinic) =>
+    switch (serviceCategory(clinic)) {
+      'PENDAFTARAN' => PatientServiceCategory.registration,
+      'APOTEK' => PatientServiceCategory.pharmacy,
+      'LABORATORIUM' => PatientServiceCategory.laboratory,
+      'RADIOLOGI' => PatientServiceCategory.radiology,
+      'KASIR' => PatientServiceCategory.billing,
+      'REKAM_MEDIS' => PatientServiceCategory.medicalRecords,
+      'POLIKLINIK' => switch ('${clinic['kode'] ?? ''}'.trim().toUpperCase()) {
+        'UMUM' ||
+        'POLI_UMUM' ||
+        'POLIKLINIK_UMUM' => PatientServiceCategory.general,
+        'GIGI' ||
+        'POLI_GIGI' ||
+        'POLIKLINIK_GIGI' => PatientServiceCategory.dental,
+        _ => PatientServiceCategory.other,
+      },
+      _ => PatientServiceCategory.other,
+    };
 
 /// Home priorities only; the remaining catalog rows keep their relative order.
 List<Json> registrationFirst(List<Json> services) {
   final priorities = <int>{};
-  for (final code in patientDailyServiceOrder) {
-    var index = services.indexWhere(
-      (c) => '${c['kode']}'.trim().toUpperCase() == code,
-    );
-    if (index < 0 && (code == 'PENDAFTARAN' || code == 'APOTEK')) {
-      final category = code == 'PENDAFTARAN'
-          ? PatientServiceCategory.registration
-          : PatientServiceCategory.pharmacy;
-      index = services.indexWhere((c) => homeServiceCategory(c) == category);
+  for (final category in patientDailyServiceOrder) {
+    for (var i = 0; i < services.length; i++) {
+      if (serviceCategory(services[i]) == category) priorities.add(i);
     }
-    if (index >= 0) priorities.add(index);
   }
   return [
     for (final index in priorities) services[index],

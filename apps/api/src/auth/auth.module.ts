@@ -5,6 +5,8 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { AuthAuditService } from './audit/auth-audit.service';
+import { AuthAuditController } from './audit/auth-audit.controller';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { JwtStrategy } from './jwt.strategy';
@@ -27,7 +29,7 @@ import {
     }),
     JwtModule.register({}),
   ],
-  controllers: [AuthController, ProfileController],
+  controllers: [AuthController, ProfileController, AuthAuditController],
   providers: [
     ProfileService,
     ProfileThrottleGuard,
@@ -38,12 +40,14 @@ import {
         resolve(process.env.USER_AVATAR_DIR?.trim() || '.queueb-media/avatar'),
     },
     AuthService,
+    AuthAuditService,
     PasswordService,
     JwtStrategy,
     JwtAuthGuard,
     RolesGuard,
   ],
   exports: [
+    AuthAuditService,
     PasswordService,
     JwtAuthGuard,
     RolesGuard,

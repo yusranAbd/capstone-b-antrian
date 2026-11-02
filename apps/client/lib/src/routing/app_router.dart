@@ -179,6 +179,7 @@ class AppRouting {
                     GoRoute(
                       path: 'new',
                       name: 'patient-booking',
+                      redirect: (_, state) => patientBookingRedirect(state.uri),
                       pageBuilder: (context, state) => _patientPage(
                         context,
                         state,

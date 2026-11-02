@@ -95,7 +95,7 @@ void main() {
           }
           if (role == 'USER') {
             await tester.tap(
-              find.widgetWithText(NavigationDestination, 'Riwayat'),
+              find.widgetWithText(NavigationDestination, 'Reservasi'),
             );
             await tester.pumpAndSettle();
             expect(find.text('UM-001'), findsOneWidget);

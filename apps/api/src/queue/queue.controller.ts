@@ -24,6 +24,8 @@ import type { Request } from 'express';
 import { PeranPengguna } from '../generated/prisma/client';
 import { MasukAntreanDto } from './dto/masuk-antrean.dto';
 import { QueueService } from './queue.service';
+import { QueueResolutionService } from './queue-resolution.service';
+import { BatalkanSesiBerakhirDto } from './dto/batalkan-sesi-berakhir.dto';
 import { PanggilBerikutnyaDto } from './dto/panggil-berikutnya.dto';
 
 // ==========================================
@@ -47,7 +49,20 @@ type RequestTerautentikasi = Request & {
 @Controller('queue')
 @UseGuards(AuthGuard('jwt'))
 export class QueueController {
-  constructor(private readonly queueService: QueueService) {}
+  constructor(
+    private readonly queueService: QueueService,
+    private readonly resolution: QueueResolutionService,
+  ) {}
+
+  @Post(':tiketId/batalkan-sesi-berakhir')
+  @HttpCode(HttpStatus.OK)
+  batalkanSesiBerakhir(
+    @Param('tiketId', new ParseUUIDPipe({ version: '4' })) tiketId: string,
+    @Body() dto: BatalkanSesiBerakhirDto,
+    @Req() request: RequestTerautentikasi,
+  ) {
+    return this.resolution.batalkan(tiketId, this.ambilPetugasId(request), dto);
+  }
 
   // ========================================
   // MENDAPATKAN IDENTITAS PETUGAS
@@ -105,9 +120,8 @@ export class QueueController {
     @Query('loketId', new ParseUUIDPipe({ version: '4' }))
     loketId: string,
 
-    @Query('hanyaTidakLayak', new DefaultValuePipe(false), ParseBoolPipe)
-    hanyaTidakLayak // Union mencegah ValidationPipe global mengonversi nilai invalid sebelum ParseBoolPipe.
-    : boolean | string,
+    @Query('hanyaTidakLayak', new DefaultValuePipe(false), ParseBoolPipe) // Union mencegah ValidationPipe global mengonversi nilai invalid sebelum ParseBoolPipe.
+    hanyaTidakLayak: boolean | string,
 
     @Req()
     request: RequestTerautentikasi,
@@ -139,7 +153,11 @@ export class QueueController {
     request: RequestTerautentikasi,
   ) {
     const petugasId = this.ambilPetugasId(request);
-    return this.queueService.snapshotAntrean(petugasId, loketId, halamanTindakLanjut);
+    return this.queueService.snapshotAntrean(
+      petugasId,
+      loketId,
+      halamanTindakLanjut,
+    );
   }
 
   // ========================================

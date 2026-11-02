@@ -406,7 +406,7 @@ void main() {
               find.byType(NavigationDestination),
             )
             .map((w) => w.label),
-        ['Beranda', 'Riwayat', 'Informasi', 'Profil'],
+        ['Beranda', 'Reservasi', 'Informasi', 'Profil'],
       );
     },
   );

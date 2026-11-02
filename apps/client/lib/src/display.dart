@@ -16,6 +16,7 @@ import 'features/display/models/display_models.dart';
 import 'features/display/services/display_audio_controller.dart';
 import 'mobile_ui.dart';
 import 'widgets.dart';
+import 'queueb_feedback.dart';
 
 export 'features/display/services/announcement_gate.dart' show AnnouncementGate;
 
@@ -190,12 +191,9 @@ class _DisplayPageState extends State<DisplayPage> with WidgetsBindingObserver {
                   await fullscreen.toggle();
                 } catch (_) {
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Fullscreen tidak tersedia. Gunakan mode layar penuh browser.',
-                        ),
-                      ),
+                    QueueBFeedback.error(
+                      context,
+                      'Fullscreen tidak tersedia. Gunakan mode layar penuh browser.',
                     );
                   }
                 }

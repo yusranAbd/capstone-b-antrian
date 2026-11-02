@@ -1,6 +1,8 @@
 # AUTH-SESSION-01 — Tindak lanjut audit refresh sesi
 
-Tanggal: 30 Oktober 2026 (WIT). Status: **OPEN — desain belum disetujui, implementasi belum dilakukan**.
+Tanggal awal: 30 Oktober 2026 (WIT). Status per 2 November: **OPEN — histori tetap UNATTRIBUTED; migration audit prospektif diterapkan lokal, integrasi lifecycle belum diverifikasi**.
+
+**Pembaruan 2 November 2026:** pengguna meminta implementasi rekomendasi nomor 6. Kode telemetry prospektif dan halaman ADMIN sudah ditambahkan; migrasi kemudian diterapkan pada development lokal untuk memulihkan dashboard. Pembacaan referensi akun/sesi berhasil; pencatatan lifecycle dan retensi belum diverifikasi melalui integrasi database. Implementasi memakai referensi UUID acak pada akun/sesi, bukan HMAC; request ID dibuat server, klaim klien ditandai belum terverifikasi, sumber tetap UNKNOWN, dan sink fail-open dibatasi waktu. Retensi bacaan 30 hari dengan pembersihan fisik oportunistik. Lihat [kontrak implementasi](API_INTEGRATION_GUIDE.md#notifikasi-pasien-laporan-operasional-dan-audit-sesi--2-november-2026) dan [QA poin 4–6](../qa/IMPROVEMENTS_4_6_2026_11_02.md). Uraian B1–B4 di bawah tetap merupakan proposal/acceptance historis; tidak seluruh acceptance telah terpenuhi. Temuan historis UNATTRIBUTED/FAIL tetap terbuka dan tidak dipulihkan oleh telemetry baru.
 
 Asal: [Development Dataset V2 — accepted historical audit exception](DEVELOPMENT_DATASET_V2.md#final-closure--accepted-historical-audit-exception). Ini backlog keamanan terpisah dari penutupan dataset. Tidak ada backlog auth existing yang lebih tepat; dokumen gap operasional existing membahas antrean klinis, bukan lifecycle sesi.
 
