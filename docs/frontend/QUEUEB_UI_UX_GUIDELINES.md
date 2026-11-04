@@ -1,6 +1,12 @@
-# QueueB Hospital — Compact & Professional UI/UX Design System
+# Kliinik Kelompok B — Compact & Professional UI/UX Design System
 
-Panduan mandiri untuk Flutter QueueB Hospital. Ini menjadi acuan seluruh penyempurnaan visual berikutnya. Kebutuhan pengguna, keselamatan operasional, aksesibilitas dan kontrak aplikasi lebih utama daripada mengejar kepadatan atau dekorasi.
+Panduan mandiri untuk Flutter Kliinik Kelompok B. Ini menjadi acuan seluruh penyempurnaan visual berikutnya. Kebutuhan pengguna, keselamatan operasional, aksesibilitas dan kontrak aplikasi lebih utama daripada mengejar kepadatan atau dekorasi.
+
+Nama tampilan aktif sejak 4 November 2026 adalah **Kliinik Kelompok B**,
+sesuai ejaan yang diminta pengguna. Identitas publik Dart mengambil
+`AppBrand` di `app_brand.dart`. Nama QueueB pada class, file, package,
+protokol, dan catatan desain sebelumnya tetap sebagai identitas teknis atau
+riwayat; perubahan nama tidak mengganti API, database, QR, atau autentikasi.
 
 ## Prinsip
 
@@ -102,6 +108,47 @@ ADMIN memakai satu skala heading 22/17/15 dan body 13 dengan line height 1,4–1
 
 Judul, keterangan dan aksi halaman disusun melalui AdminPageHeading; aksi turun ke baris berikutnya pada viewport sempit atau teks diperbesar. Kelola Layanan Terpadu berada di header Dashboard. Kartu ringkasan menonjolkan nilai aktual dan jumlah aktif tanpa grafik/estimasi. Daftar layanan memakai pagination bernomor delapan baris dan menyembunyikan footer saat seluruh data sudah muat. Nama layanan dan kode dibedakan secara tipografi; status tetap label + warna/ikon. Navigasi mempertahankan seluruh tujuan langsung, dengan indikator aktif yang lebih tegas; sidebar desktop 232 dan mode ringkas 72. Search/filter memakai panel yang sama secara visual dengan tabel dan tetap Wrap saat sempit. [Implementasi dan batas verifikasi](ADMIN_MODERN_REFRESH_2026_11_02.md).
 
+### Dashboard ADMIN — referensi 4 November 2026
+
+Dashboard mengikuti komposisi gambar pengguna `Temp/screen.png` serta
+`Temp/DESIGN.md`: header putih ringkas, sidebar berkelompok dengan menu aktif
+biru, empat kartu KPI, grid monitoring layanan dan panel bawah dua kolom.
+Kanvas lavender, panel putih radius 12, kontrol radius 8–10, ikon outline,
+judul 16–22, body 13 dan metadata 11–12. Branding dan font Material existing
+tetap digunakan. Sidebar desktop 248, collapsed 72; layar kecil memakai menu
+existing. Konten panjang dapat scroll, grid beralih 4/2/1 kolom dan seluruh
+layanan tetap dapat diakses melalui pagination.
+
+KPI bersumber dari laporan operasional tanggal pelayanan hari ini:
+`pasienUnik`, `dilayani`, `selesai`, `menunggu`. Unit pasien unik dibedakan dari
+jumlah tiket. Waktu tunggu merupakan pengukuran server dengan jumlah sampel,
+bukan perkiraan bagi antrean yang belum dilayani. Data belum tersedia diberi
+tanda —. Cakupan kuota adalah layanan aktif dengan kapasitas positif pada hari
+tersebut; numerator tiket tidak dibatalkan dan denominator kapasitas memakai
+himpunan layanan yang sama. Kapasitas harian tidak dilabeli sebagai kapasitas
+sesi dokter.
+
+Kartu monitoring menampilkan ringkasan per layanan, jadwal serta ruang dan
+profil/penugasan aktif yang sesuai. Dokter/petugas nonaktif tidak ditampilkan
+sebagai penugasan saat ini. Aksi mengarah ke pengelolaan layanan, jadwal dan
+ruang existing. Tabel bawah adalah **Aktivitas Layanan Hari Ini**, bukan log
+CALL. Panel kanan memakai kelengkapan konfigurasi `/layanan/kesiapan` existing
+dan pemakaian kapasitas harian. Sidebar mempertahankan seluruh tujuan dan
+menambahkan pintasan Kelola Layanan Terpadu. Menu akun header memakai nama
+dan avatar asli serta callback profil/logout existing.
+
+Dashboard bersifat snapshot dengan muat ulang manual dan timestamp aktual.
+Tidak mengklaim live 5 detik, operasional aktif, cloud latency, tren kemarin,
+BPJS/P-Care, Super Admin, multi-fasilitas, nomor antrean per ruang atau alarm
+kritis yang tidak disediakan kontrak ADMIN. CALL/RECALL/SKIP tetap milik
+PETUGAS; RBAC, Queue Engine, API dan database tidak diubah.
+
+Ekspor Laporan memakai PDF operasional existing dengan snapshot, tanggal,
+identitas sesi dan guard navigasi. Pada tahap awal verifikasi dibatasi format
+dan analyze terarah (0 masalah). Build Web gabungan kemudian diperbarui pada
+revisi Janji Temu di bawah; ini bukan pengujian UI admin atau suite regresi.
+Tidak ada commit atau push.
+
 ### Dokter ADMIN dan agenda praktik
 
 Daftar Dokter memakai baris 64 logical px (bertambah mengikuti text scaling), identitas dan akun ringkas serta 6 baris per halaman; opsi jumlah baris dan seluruh menu aksi tetap tersedia. Bantuan alur profil/poliklinik/akun dipindahkan ke tombol Panduan dokter agar tidak menjadi banner permanen.
@@ -123,6 +170,163 @@ Arahan Patient Home V8 (31 Oktober 2026) menggantikan komposisi Beranda V6/V7 da
 | Target sentuh | sekitar 44–48, termasuk area hit |
 
 Gunakan alur progresif pilih dokter/poli → jadwal → konfirmasi → tiket. QR harus utuh dengan quiet zone, dapat dibaca scanner, dan tidak diperkecil demi memuat lebih banyak konten. Tanggal, status dan lokasi harus jelas. Konten panjang boleh scroll; tombol utama jangan tertutup keyboard, navbar atau FAB. Jangan membawa font tabel desktop 12px ke seluruh body pasien.
+
+### Referensi beranda pasien — 3 November 2026
+
+Beranda Ambil Antrean dan Janji Temu mengikuti referensi pengguna dari
+`stitch_queueb_mobile_ui_redesign`. Revisi terakhir pengguna 4 November 2026
+memakai kembali komposisi kompak dari DESIGN.md: kartu sapaan putih, ikon
+tas medis outline, pencarian ringkas, dan banner kunjungan dengan lonceng.
+Sapaan, pencarian dan kunjungan terdekat berada di atas pada kedua mode.
+Tab **Ambil Antrean / Janji Temu** berada di bawah
+bagian tersebut, lalu tetap pinned ketika header konten digulir. Branding QueueB,
+font Material, navigasi, satu controller tab, swipe, dan state filter existing
+tetap digunakan. Card memakai sudut semi kotak dan tinggi mengikuti konten.
+
+Beranda dibatasi 480 logical px pada layar lebar, dengan margin 16. Header
+normal 64, tab minimal 48, kartu radius 12 dan kontrol radius 8–10. Sapaan
+20, judul layanan 18, judul bagian 16, isi 13–14 dan metadata 11–12;
+nomor tiket dalam kartu ringkas 22–26 dan jumlah menunggu 24. Font Material
+dan branding existing tetap dipakai; tidak ada dependency/font/aset baru.
+Foto dokter beranda 44 dengan sudut 8. Ikon navigasi memakai outline:
+rumah, kalender check, informasi, dan profil. Semua ukuran tetap mengikuti
+text scaling; layar sempit/teks besar membungkus atau beralih susunan.
+
+Gesture ke atas yang menggulir konten ke bawah menyembunyikan header dan
+navbar; arah balik menampilkannya. Boundary scroll Beranda dihitung dari
+header luar serta daftar tab aktif, bukan offset nol salah satu viewport.
+Scroll horizontal/programmatic tidak memicu hide. Fokus pencarian, navigasi
+aksesibel native, pergantian halaman dan posisi teratas memulihkan chrome.
+Listener fokus serta input Web tetap dilepas saat dispose. Tombol konfirmasi
+detail dokter tetap terlihat sesuai kontrak halaman tersebut.
+
+Kartu walk-in memisahkan nomor pribadi/pelayanan dari sisi **Sisa antrean**
+(`waitingCount`). Angka kumulatif tetap berlabel **check-in hari ini**, bukan
+jumlah pendaftar. **Lihat Status** membuka tiket milik pasien; **Ambil Nomor**
+memakai alur registrasi existing. Nomor pelayanan beberapa ruang tetap utuh.
+Kartu dokter menampilkan foto, spesialisasi, poli, jadwal/ruang aktual dan
+**Detail & Jadwal**. Ketersediaan slot, BPJS, badge verifikasi, status buka
+fasilitas, dan ETA contoh tidak diasumsikan tersedia dari data beranda.
+
+Revisi kompak awal hanya diformat sesuai arahan sebelumnya untuk pekerjaan
+visual. Build Web gabungan kemudian diperbarui bersama revisi Janji Temu di
+bawah. Tidak ada pengujian UI otomatis atau perubahan API/database, commit
+atau push; hasil CI lama bukan bukti regresi untuk revisi terbaru.
+
+### Pemadatan tab Janji Temu — 4 November 2026
+
+Revisi lanjutan Janji Temu memakai skala panduan desain yang telah diberikan:
+nama dokter 15 semibold, metadata 12, foto 40 dengan radius 8, padding kartu
+10 dan gap 6–8. Spesialisasi/poli hanya ditampilkan sekali. Jadwal dan ruang
+digabungkan dengan CTA **Detail & Jadwal** dalam satu footer; pada layar
+sempit atau teks besar tombol pindah baris tanpa memotong informasi.
+
+Filter layanan tetap horizontal dengan target sentuh native dan label 12.
+Heading **Dokter Hari Ini** memakai tanggal ringkas aktual, agar tidak
+memaksa baris kedua. Jarak ganda antara kartu terakhir dan bantuan jadwal
+dihilangkan; bantuan tetap membuka chooser reservasi existing. Sapaan,
+pencarian serta kunjungan terdekat tetap pada header bersama **di atas tab**
+(`tabsFirst: false`), bukan dipindahkan ke dalam daftar Janji Temu.
+
+Callback pemilihan dokter, pemeriksaan revisi/route/mounted, filter, lazy list,
+realtime dan pembatasan mode reservasi tidak diubah. Tidak ada mutasi database,
+commit atau push. Preview Web telah diperbarui dengan build JavaScript release
+(`--no-pub --no-wasm-dry-run`) pada 4 November 2026, 12:12:45 waktu host.
+Build berhasil dalam 101 detik; HTML, main.dart.js dan health API merespons
+HTTP 200. SHA-256 aset yang disajikan HTTP cocok dengan file build. Preview
+`http://127.0.0.1:5175/` tetap mengarah ke API simulasi lokal port 3003 dengan
+zona Asia/Jakarta. Tab browser lama memerlukan Ctrl+Shift+R. Tidak dilakukan
+pengujian UI otomatis; keberhasilan build bukan verifikasi visual/runtime
+semua interaksi.
+
+### Referensi detail dokter pasien — 4 November 2026
+
+Detail Dokter mengikuti referensi pengguna `stitch_queueb_mobile_ui_redesign (2)`:
+header putih dengan kembali/profil, kartu identitas putih semi kotak, foto dari
+media dokter existing, kalender tanggal dan bulan, kartu sesi, grid jam, dan
+informasi kedatangan. Status menyatakan **jadwal** praktik, bukan kehadiran
+dokter. Rating, SIP, pengalaman, badge verifikasi, serta aturan kedatangan
+contoh tidak ditambahkan tanpa sumber data.
+
+Pada detail janji temu, navigasi bawah sementara menjadi ringkasan tanggal/jam
+terpilih dan tombol **Konfirmasi Janji** yang tetap terlihat saat scroll.
+Navigasi pasien empat tujuan tetap tersedia pada halaman lainnya; tombol
+kembali mempertahankan asal pencarian/layanan. Bar menggunakan SafeArea dan
+ruang layout Scaffold, sehingga tidak menimpa konten. Susunan bar dan grid
+beradaptasi terhadap lebar serta text scaling. Kalender hanya menampilkan
+tanggal praktik yang bersumber dari API; bulan/tanggal tidak membuat data slot.
+
+Pergantian tanggal tetap membuang pilihan sesi/slot lama. Konfirmasi hanya
+aktif untuk slot dari sesi/tanggal terpilih yang aktif, tersedia dan tidak
+habis kapasitas. Aksi meneruskan dialog review dan Cubit pemesanan existing.
+Layanan ANTREAN_HARIAN tidak mendapat tombol booking slot dokter. Profil,
+tentang dokter, jadwal, retry, route dan kontrak API tetap memakai sumber asli.
+
+Pada implementasi awal, verifikasi dibatasi format sesuai arahan pengguna
+saat itu. Pemadatan dan hasil verifikasi terbaru dicatat pada bagian berikut;
+perilaku runtime dan hasil visual belum diuji. Tidak ada commit atau push.
+
+### Referensi halaman reservasi pasien — 4 November 2026
+
+Daftar Reservasi Pasien mengikuti referensi pengguna terbaru: header/logo
+existing, pencarian dengan filter status, chip horizontal, kartu kunjungan
+putih dan tombol **Buat Reservasi Baru** di akhir daftar. FAB pembuatan
+reservasi pada halaman ini diganti tombol dalam alur konten agar tidak
+menutup kartu. Pencarian, pull-to-refresh, lazy list, scroll controller dan
+state filter tetap dipertahankan saat data diperbarui.
+
+Kartu mengutamakan layanan, dokter bila tersedia, nomor/kode tiket asli,
+tanggal, jam dan ruangan yang tersedia. Status tiket tetap otoritatif;
+**Berlangsung** memfilter status operasional pada hari ini. **Riwayat**
+mencakup status terminal dan kunjungan dengan tanggal yang telah lewat,
+tanpa mengubah status tiket tersebut menjadi Selesai. Angka header berasal
+dari koleksi milik pasien; data yang belum terverifikasi ditandai —.
+
+Ringkasan nomor pelayanan hanya memakai proyeksi antrean existing dengan
+layanan dan tanggal yang cocok; tidak ada langganan atau endpoint tambahan.
+Kartu membedakan Live, data terakhir, dan belum tersedia, tanpa mengarang
+urutan/estimasi sisa antrean. Pembukaan tiket/QR, pengecekan otorisasi serta
+konfirmasi pembatalan tetap melalui callback existing. Aksi Ubah Jadwal
+atau bukti kunjungan baru tidak dibuat hanya karena ada pada contoh desain.
+
+Pada implementasi awal, verifikasi dibatasi format sesuai arahan pengguna
+saat itu. Pemadatan dan hasil verifikasi terbaru dicatat pada bagian berikut;
+hasil runtime/visual belum diuji. Tidak ada commit atau push.
+
+### Pemadatan detail dokter dan reservasi — 4 November 2026
+
+Revisi lanjutan kedua halaman mengikuti DESIGN.md dan gambar pengguna dengan
+skala yang sama seperti tab Janji Temu. Konten pasien terpusat maksimal 480
+logical px, margin horizontal 16, kartu radius 12 dan jarak antarkomponen 8.
+Perubahan ini dibatasi ke detail dokter serta daftar reservasi; tema global,
+portal operasional dan alur reservasi lainnya tidak diperkecil.
+
+Detail dokter memakai foto 56, nama 18, metadata 12–13 dan padding 12.
+Kalender memakai tanggal selebar 60 pada skala normal, angka 22, serta tinggi
+yang dihitung dari text scaling. Label bulan dapat membungkus dan tanggal
+terpilih diungkap ulang saat ukuran teks berubah. Kartu sesi menampilkan jam,
+zona waktu dan ruang aktual; grid slot memiliki minimum 78 dan tetap tumbuh
+sesuai isi. Header 60, panel kedatangan 13, serta bar konfirmasi ringkas dengan
+target sentuh 48. Pilihan sesi/slot, guard dan dialog review tidak diubah.
+
+Daftar reservasi memakai heading 20, judul layanan 16, nama dokter/isi 13,
+metadata 12 dan label status 11. Kartu padding 12, panel jadwal/antrean 10,
+jarak kartu 8, pencarian 13 dan filter native yang ringkas. Tombol tetap
+memiliki area sentuh 44–48, dapat berpindah baris dan mengikuti text scaling.
+Pencarian/filter tersimpan, lazy list, refresh, status tiket otoritatif,
+proyeksi antrean, izin QR dan konfirmasi pembatalan tetap memakai alur asli.
+Tidak ada SIP/rating/pengalaman, aturan kedatangan, estimasi, atau aksi ubah
+jadwal baru yang diambil dari data contoh pada gambar.
+
+Keempat file UI telah diformat. Flutter analyze terarah pada keempat file
+selesai tanpa masalah (14,4 detik setelah memperbaiki satu saran linter).
+Tidak ada pengujian UI, mutasi database, commit atau push dalam revisi ini.
+Build Web release JavaScript (`--no-pub --no-wasm-dry-run`) berhasil dalam
+99,1 detik; aset diperbarui 4 November 2026 pukul 13:05:54 waktu host.
+Preview `http://127.0.0.1:5175/`, main.dart.js dan health API simulasi lokal
+port 3003 merespons HTTP 200; SHA-256 aset HTTP cocok dengan file build.
+Tab browser lama memerlukan Ctrl+Shift+R. Keberhasilan kompilasi serta
+pemeriksaan aset bukan bukti verifikasi interaksi atau hasil visual UI.
 
 ## Standar Public Display
 

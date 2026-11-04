@@ -7,7 +7,7 @@
         android:allowBackup="false"
         android:fullBackupContent="false"
         android:dataExtractionRules="@xml/session_backup_rules"
-        android:label="QueueB Hospital"
+        android:label="Kliinik Kelompok B"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

@@ -22,10 +22,14 @@ class ProfessionalDoctorAvatar extends StatelessWidget {
     required this.config,
     required this.photo,
     this.radius = 28,
+    this.borderRadius,
   });
   final AppConfig config;
   final Object? photo;
   final double radius;
+
+  /// Optional detail-card crop; existing avatars remain circular by default.
+  final BorderRadius? borderRadius;
   @override
   Widget build(BuildContext context) {
     final url = doctorPhotoUrl(config, photo);
@@ -43,28 +47,29 @@ class ProfessionalDoctorAvatar extends StatelessWidget {
         ),
       ),
     );
+    final portrait = SizedBox.square(
+      dimension: radius * 2,
+      child: url == null
+          ? fallback()
+          : Image.network(
+              url,
+              cacheWidth: imageDecodeWidth(
+                radius * 2,
+                MediaQuery.devicePixelRatioOf(context),
+              ),
+              fit: BoxFit.cover,
+              excludeFromSemantics: true,
+              loadingBuilder: (context, child, loading) =>
+                  loading == null ? child : fallback(),
+              errorBuilder: (context, error, stack) => fallback(),
+            ),
+    );
     return Semantics(
       label: 'Foto profil profesional dokter',
       image: true,
-      child: ClipOval(
-        child: SizedBox.square(
-          dimension: radius * 2,
-          child: url == null
-              ? fallback()
-              : Image.network(
-                  url,
-                  cacheWidth: imageDecodeWidth(
-                    radius * 2,
-                    MediaQuery.devicePixelRatioOf(context),
-                  ),
-                  fit: BoxFit.cover,
-                  excludeFromSemantics: true,
-                  loadingBuilder: (context, child, loading) =>
-                      loading == null ? child : fallback(),
-                  errorBuilder: (context, error, stack) => fallback(),
-                ),
-        ),
-      ),
+      child: borderRadius == null
+          ? ClipOval(child: portrait)
+          : ClipRRect(borderRadius: borderRadius!, child: portrait),
     );
   }
 }

@@ -7,6 +7,7 @@ import '../../../config.dart';
 import '../../../patient_sync.dart';
 import '../models/patient_models.dart';
 import '../models/patient_queue_models.dart';
+import '../models/patient_ticket_dispatch.dart';
 
 const patientCatalogPaths = {
   '/layanan',
@@ -48,13 +49,16 @@ class PatientRepository extends ChangeNotifier {
   Set<String> _queueReading = const {};
   Future<void>? _queuePending;
   int _queueEpoch = 0, _queueRevision = 0;
+  final _ticketQueueScopes = <Object, (String, String, String)>{};
+  Set<String> _watchedQueueIds = const {};
+  String _watchedQueueDate = '';
 
   /// Presentation configures the visible Home service identities outside build.
   void configureQueueScope(Iterable<String> services, String date) {
     if (!active || !validPatientQueueDate(date)) return;
     final ids = services.where((id) => id.isNotEmpty).toSet();
     if (setEquals(ids, _queueIds) && date == _queueDate) {
-      updates.watchQueue(ids, date);
+      _updateQueueWatch();
       return;
     }
     _queueEpoch++;
@@ -68,8 +72,103 @@ class PatientRepository extends ChangeNotifier {
     _queueErrors.clear();
     _queueDirty.addAll(ids);
     _publishQueue();
-    updates.watchQueue(ids, date);
+    _updateQueueWatch();
     unawaited(refreshQueue());
+  }
+
+  /// A detail reader leases its verified service on the shared Home socket.
+  /// Releasing one reader never removes the Home scope or another open reader.
+  void retainTicketDispatchScope(Object owner, String ticketId) {
+    if (!active) return;
+    final ticket = snapshot.ticket(ticketId);
+    final serviceId = object(ticket?['layanan'])['id'] ?? ticket?['layananId'];
+    final date = dateOnly(
+      ticket?['tanggalPelayanan'] ?? ticket?['tanggalAntrean'],
+    );
+    if (ticket == null ||
+        serviceId is! String ||
+        serviceId.isEmpty ||
+        !const {
+          'CHECK_IN',
+          'MENUNGGU',
+          'DIPANGGIL',
+          'DILAYANI',
+          'DILEWATI',
+        }.contains(ticket['status']) ||
+        date != api.config.today) {
+      releaseTicketDispatchScope(owner);
+      return;
+    }
+    final scope = (ticketId, serviceId, date);
+    if (_ticketQueueScopes[owner] == scope) return;
+    _ticketQueueScopes[owner] = scope;
+    _updateQueueWatch();
+  }
+
+  void releaseTicketDispatchScope(Object owner) {
+    if (_ticketQueueScopes.remove(owner) == null) return;
+    if (active) _updateQueueWatch();
+  }
+
+  void _updateQueueWatch() {
+    if (!active) return;
+    final today = api.config.today;
+    final detailScopes = _ticketQueueScopes.values
+        .where((scope) => scope.$3 == today)
+        .toList();
+    final date = _queueDate.isEmpty ? today : _queueDate;
+    final ids = <String>{if (_queueDate == date) ..._queueIds};
+    // Preserve every existing Home identity. Extra detail services may use
+    // snapshot-only reads when the shared subscription has reached its cap.
+    for (final scope in detailScopes) {
+      if (scope.$3 == date && ids.length < 100) ids.add(scope.$2);
+    }
+    _watchedQueueIds = Set.unmodifiable(ids);
+    _watchedQueueDate = date;
+    updates.watchQueue(ids, date);
+  }
+
+  bool ticketDispatchConnected(String ticketId) {
+    if (!active || !updates.queueConnected) return false;
+    final ticket = snapshot.ticket(ticketId);
+    final serviceId = object(ticket?['layanan'])['id'] ?? ticket?['layananId'];
+    final date = dateOnly(
+      ticket?['tanggalPelayanan'] ?? ticket?['tanggalAntrean'],
+    );
+    return ticket != null &&
+        date == api.config.today &&
+        _watchedQueueDate == date &&
+        _watchedQueueIds.contains(serviceId) &&
+        _ticketQueueScopes.values.any(
+          (scope) =>
+              scope.$1 == ticketId && scope.$2 == serviceId && scope.$3 == date,
+        );
+  }
+
+  bool hasTicketDispatchScope(Object owner, String ticketId) {
+    final scope = _ticketQueueScopes[owner];
+    return active &&
+        scope != null &&
+        scope.$1 == ticketId &&
+        scope.$3 == api.config.today &&
+        _watchedQueueDate == scope.$3 &&
+        _watchedQueueIds.contains(scope.$2);
+  }
+
+  /// Kept separate from refresh(): dispatch is not a canonical ticket row.
+  Future<PatientTicketDispatch> readTicketDispatch(String ticketId) async {
+    check();
+    if (snapshot.ticket(ticketId) == null) {
+      throw const ApiException(404, 'Tiket belum terverifikasi.');
+    }
+    final epoch = _epoch;
+    final raw = await api.request(
+      'GET',
+      '/tiket/${Uri.encodeComponent(ticketId)}/dispatch',
+    );
+    check();
+    if (epoch != _epoch) throw const ApiException(401, 'Sesi pasien berubah.');
+    return PatientTicketDispatch.parse(raw, ticketId);
   }
 
   void _queueFeedChanged() {
@@ -83,7 +182,10 @@ class PatientRepository extends ChangeNotifier {
       summaries: _queueValues,
       loading: {..._queueReading, ..._queueDirty},
       errors: _queueErrors,
-      connected: updates.queueConnected,
+      connected:
+          updates.queueConnected &&
+          _watchedQueueDate == _queueDate &&
+          _queueIds.every(_watchedQueueIds.contains),
     );
   }
 
@@ -167,6 +269,9 @@ class PatientRepository extends ChangeNotifier {
     _queueEpoch++;
     _queueDirty.clear();
     _queueValues.clear();
+    _ticketQueueScopes.clear();
+    _watchedQueueIds = const {};
+    _watchedQueueDate = '';
     queueState.value = PatientQueueState();
     _closeFeed();
     notifyListeners();
@@ -361,6 +466,8 @@ class PatientRepository extends ChangeNotifier {
     _disposed = true;
     _epoch++;
     _dirty.clear();
+    _ticketQueueScopes.clear();
+    _watchedQueueIds = const {};
     api.removeListener(_sessionChanged);
     _closeFeed();
     queueState.dispose();

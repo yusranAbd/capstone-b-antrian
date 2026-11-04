@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'app_brand.dart';
 import 'config.dart';
 import 'mobile_ui.dart';
 import 'queueb_motion.dart';
@@ -169,18 +170,19 @@ class DisplayBoard extends StatelessWidget {
                     const TextSpan(
                       children: [
                         TextSpan(
-                          text: 'QueueB\n',
+                          text: '${AppBrand.leading}\n',
                           style: TextStyle(color: Color(0xff101e4a)),
                         ),
                         TextSpan(
-                          text: 'Hospital',
+                          text: AppBrand.accent,
                           style: TextStyle(color: Color(0xff315ddb)),
                         ),
                       ],
                     ),
+                    semanticsLabel: AppBrand.name,
                     style: TextStyle(
-                      fontSize: 42 * unit,
-                      height: .98,
+                      fontSize: 28 * unit,
+                      height: 1.05,
                       letterSpacing: -.8 * unit,
                       fontWeight: FontWeight.w800,
                     ),

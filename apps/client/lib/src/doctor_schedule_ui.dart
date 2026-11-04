@@ -25,80 +25,201 @@ class DoctorProfileCard extends StatelessWidget {
   final VoidCallback? onSchedule;
   final bool detail;
 
-  @override
-  Widget build(BuildContext context) => AppCard(
-    color: detail ? PatientDesign.mint : null,
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _detailProfile(BuildContext context) {
+    final specialty = '${doctor['spesialisasi'] ?? ''}'.trim();
+    final clinicNames = clinics.trim();
+    final actualAvailability = availability?.trim() ?? '';
+    return Material(
+      color: PatientDesign.paper,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: PatientDesign.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            ProfessionalDoctorAvatar(
-              config: config,
-              photo: doctor['fotoProfil'],
-              radius: detail ? 36 : 24,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ProfessionalDoctorAvatar(
+                  config: config,
+                  photo: doctor['fotoProfil'],
+                  radius: 28,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label(doctor),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          height: 1.25,
+                          fontWeight: FontWeight.w700,
+                          color: PatientDesign.ink,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        specialty.isEmpty
+                            ? 'Spesialisasi belum dicantumkan'
+                            : specialty,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
+                          color: PatientDesign.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                color: PatientDesign.soft,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.all(8),
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    label(doctor),
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      fontSize: detail ? 20 : 16,
+                  const Icon(
+                    Icons.local_hospital_outlined,
+                    color: PatientDesign.primary,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      clinicNames.isEmpty
+                          ? 'Poliklinik belum dicantumkan'
+                          : clinicNames,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        height: 1.35,
+                        fontWeight: FontWeight.w600,
+                        color: PatientDesign.ink,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${doctor['spesialisasi'] ?? 'Spesialisasi belum dicantumkan'}',
-                    style: const TextStyle(color: PatientDesign.muted),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    clinics,
-                    style: const TextStyle(color: PatientDesign.darkTeal),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
-        if (availability != null) ...[
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              const Icon(
-                Icons.event_available_outlined,
-                size: 18,
-                color: PatientDesign.muted,
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  availability!,
-                  style: const TextStyle(
-                    fontSize: 12,
+            if (actualAvailability.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.event_available_outlined,
+                    size: 16,
                     color: PatientDesign.muted,
                   ),
-                ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      actualAvailability,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        height: 1.35,
+                        color: PatientDesign.muted,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => detail
+      ? _detailProfile(context)
+      : AppCard(
+          color: detail ? PatientDesign.mint : null,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ProfessionalDoctorAvatar(
+                    config: config,
+                    photo: doctor['fotoProfil'],
+                    radius: detail ? 36 : 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          label(doctor),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                fontSize: detail ? 20 : 16,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${doctor['spesialisasi'] ?? 'Spesialisasi belum dicantumkan'}',
+                          style: const TextStyle(color: PatientDesign.muted),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          clinics,
+                          style: const TextStyle(color: PatientDesign.darkTeal),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (availability != null) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.event_available_outlined,
+                      size: 18,
+                      color: PatientDesign.muted,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        availability!,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: PatientDesign.muted,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              if (!detail) ...[
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: onSchedule,
+                  icon: const Icon(Icons.calendar_month_outlined, size: 18),
+                  label: const Text('Lihat Jadwal'),
+                ),
+              ],
+            ],
           ),
-        ],
-        if (!detail) ...[
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: onSchedule,
-            icon: const Icon(Icons.calendar_month_outlined, size: 18),
-            label: const Text('Lihat Jadwal'),
-          ),
-        ],
-      ],
-    ),
-  );
+        );
 }
 
 /// Values are calendar DATE strings from the API, never derived practice days.
@@ -243,62 +364,125 @@ class ConsultationSlotGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, box) {
-      final columns = box.maxWidth >= 480 ? 3 : 2;
+      final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+      final columns = box.maxWidth >= 296 && scale <= 1.15
+          ? 3
+          : box.maxWidth >= 220 * scale
+          ? 2
+          : 1;
       final width = (box.maxWidth - (columns - 1) * 8) / columns;
       return Wrap(
         spacing: 8,
         runSpacing: 8,
-        children: [
-          for (final slot in slots)
-            SizedBox(
-              width: width,
-              child: Semantics(
-                selected: value == slot['id'],
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 12,
-                    ),
-                    backgroundColor: value == slot['id']
-                        ? PatientDesign.mint
-                        : null,
-                    side: BorderSide(
-                      color: value == slot['id']
-                          ? PatientDesign.teal
-                          : PatientDesign.border,
-                    ),
-                  ),
-                  onPressed:
-                      enabled &&
-                          slot['tersedia'] == true &&
-                          slot['aktif'] != false
-                      ? () => onChanged('${slot['id']}')
-                      : null,
-                  child: Column(
-                    children: [
-                      Text(
-                        '${config.localInput(slot['mulaiPada']).split('T').last} – ${config.localInput(slot['selesaiPada']).split('T').last}',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        consultationSlotStatus(slot),
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      if (slot['sisaKapasitas'] != null)
-                        Text(
-                          'Sisa slot ${slot['sisaKapasitas']}',
-                          style: const TextStyle(fontSize: 11),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-        ],
+        children: [for (final slot in slots) _slot(slot, width)],
       );
     },
   );
+
+  Widget _slot(Json slot, double width) {
+    final remaining = slot['sisaKapasitas'];
+    final available =
+        slot['tersedia'] == true &&
+        slot['aktif'] != false &&
+        !(remaining is num && remaining <= 0);
+    final selected = value == slot['id'] && available;
+    final canSelect = enabled && available;
+    final status = consultationSlotStatus(slot);
+    final start = config.localInput(slot['mulaiPada']).split('T').last;
+    final end = config.localInput(slot['selesaiPada']).split('T').last;
+    final ink = selected
+        ? PatientDesign.paper
+        : available
+        ? PatientDesign.ink
+        : PatientDesign.muted;
+    final surface = selected
+        ? PatientDesign.primary
+        : available
+        ? PatientDesign.soft
+        : const Color(0xfff5f6fa);
+    final slotLabel =
+        '$start–$end · $status'
+        '${remaining is num ? ' · Sisa slot $remaining' : ''}';
+    return SizedBox(
+      width: width,
+      child: Semantics(
+        selected: selected,
+        child: Tooltip(
+          message: slotLabel,
+          child: OutlinedButton(
+            key: ValueKey('consultation-slot-${slot['id']}'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(48, 78),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+              backgroundColor: surface,
+              disabledBackgroundColor: surface,
+              foregroundColor: ink,
+              disabledForegroundColor: ink,
+              side: BorderSide(
+                color: selected ? PatientDesign.primary : PatientDesign.border,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: canSelect ? () => onChanged('${slot['id']}') : null,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        start,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 17,
+                          height: 1.15,
+                          fontWeight: FontWeight.w700,
+                          color: ink,
+                          decoration: available
+                              ? TextDecoration.none
+                              : TextDecoration.lineThrough,
+                        ),
+                      ),
+                    ),
+                    if (selected) ...[
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.check_rounded,
+                        size: 16,
+                        color: PatientDesign.paper,
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$start–$end',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, height: 1.2, color: ink),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  selected ? 'Terpilih' : status,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11,
+                    height: 1.25,
+                    fontWeight: FontWeight.w600,
+                    color: selected
+                        ? PatientDesign.paper
+                        : available
+                        ? PatientDesign.success
+                        : PatientDesign.muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

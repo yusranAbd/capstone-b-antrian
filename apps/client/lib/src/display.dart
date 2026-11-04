@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'app_brand.dart';
 import 'api.dart';
 import 'config.dart';
 import 'display_board.dart';
@@ -202,7 +203,7 @@ class _DisplayPageState extends State<DisplayPage> with WidgetsBindingObserver {
           )
         : Scaffold(
             appBar: AppBar(
-              title: const Text('QueueB · Public Display'),
+              title: const Text('${AppBrand.name} · Public Display'),
               leading: IconButton(
                 tooltip: 'Kembali ke login',
                 onPressed: widget.onExit,

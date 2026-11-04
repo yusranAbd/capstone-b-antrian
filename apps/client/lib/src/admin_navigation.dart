@@ -4,11 +4,11 @@ import 'admin_schema.dart';
 import 'mobile_ui.dart';
 
 const adminNavigationGroups = <(String, List<int>)>[
-  ('Ringkasan', [-1]),
-  ('Master Data', [0, 1, 2]),
-  ('Jadwal & Kapasitas', [3, 4, 5]),
-  ('Operasional', [6, 7]),
-  ('Laporan & Aktivitas', [8, 9]),
+  ('Operasional', [-1]),
+  ('Master Data & Layanan', [0, 1, 2, 3]),
+  ('Penjadwalan', [4, 5]),
+  ('Manajemen Petugas', [6]),
+  ('Sistem & Tampilan', [7, 8, 9]),
 ];
 
 String adminSectionTitle(int index) => switch (index) {
@@ -51,138 +51,218 @@ class AdminNavigation extends StatelessWidget {
     this.collapsed = false,
     this.onToggle,
     this.onProfile,
+    this.onSetup,
   });
   final int selected;
   final ValueChanged<int>? onSelect;
   final bool collapsed;
-  final VoidCallback? onToggle, onProfile;
+  final VoidCallback? onToggle, onProfile, onSetup;
+
   @override
   Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+    padding: EdgeInsets.fromLTRB(
+      collapsed ? 10 : 12,
+      8,
+      collapsed ? 10 : 12,
+      12,
+    ),
     children: [
-      Row(
-        children: [
-          if (!collapsed)
-            const Expanded(
-              child: Padding(
-                padding: EdgeInsets.only(left: 12),
-                child: Text(
-                  'Administrasi',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: .4,
-                    color: QueueBStyle.muted,
+      if (!collapsed)
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: QueueBStyle.mint,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 12,
+              right: onToggle == null ? 12 : 2,
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.domain_outlined,
+                  size: 18,
+                  color: QueueBStyle.teal,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Semantics(
+                      header: true,
+                      child: const Text(
+                        'ADMINISTRASI',
+                        style: TextStyle(
+                          fontSize: 11,
+                          height: 1.3,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: .5,
+                          color: QueueBStyle.navy,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                if (onToggle != null)
+                  IconButton(
+                    tooltip: 'Ciutkan sidebar',
+                    onPressed: onToggle,
+                    icon: const Icon(Icons.menu_open, size: 20),
+                    color: QueueBStyle.muted,
+                  ),
+              ],
             ),
-          if (onToggle != null)
-            IconButton(
-              tooltip: collapsed ? 'Perluas sidebar' : 'Ciutkan sidebar',
-              onPressed: onToggle,
-              icon: Icon(collapsed ? Icons.menu : Icons.menu_open),
-            ),
-        ],
-      ),
+          ),
+        )
+      else if (onToggle != null)
+        Align(
+          alignment: Alignment.center,
+          child: IconButton(
+            tooltip: 'Perluas sidebar',
+            onPressed: onToggle,
+            icon: const Icon(Icons.menu, size: 20),
+            color: QueueBStyle.muted,
+          ),
+        ),
       for (final group in adminNavigationGroups) ...[
         if (!collapsed)
           Padding(
             padding: EdgeInsets.fromLTRB(
-              12,
-              group.$2.first == -1 ? 8 : 16,
-              12,
+              10,
+              group.$2.first == -1 ? 14 : 16,
+              8,
               6,
             ),
             child: Semantics(
               header: true,
               child: Text(
-                group.$1,
+                group.$1.toUpperCase(),
                 style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: .25,
+                  fontSize: 11,
+                  height: 1.3,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: .45,
                   color: QueueBStyle.muted,
                 ),
               ),
             ),
           )
         else if (group.$2.first != -1)
-          const Divider(height: 16, indent: 10, endIndent: 10),
-        for (final i in group.$2)
-          if (collapsed)
-            IconButton(
-              tooltip: adminSectionTitle(i),
-              isSelected: selected == i,
-              onPressed: onSelect == null ? null : () => onSelect!(i),
-              icon: Icon(
-                i == -1 ? Icons.dashboard_outlined : adminIcon(i),
-                size: 20,
-              ),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.only(bottom: 2),
-              child: ListTile(
-                minTileHeight: 44,
-                dense: true,
-                minLeadingWidth: 30,
-                horizontalTitleGap: 10,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                selected: selected == i,
-                selectedColor: Colors.white,
-                selectedTileColor: QueueBStyle.darkTeal,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                leading: Container(
-                  width: 30,
-                  height: 30,
-                  decoration: BoxDecoration(
-                    color: selected == i
-                        ? QueueBStyle.darkTeal
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    i == -1 ? Icons.dashboard_outlined : adminIcon(i),
-                    size: 18,
-                    color: selected == i ? Colors.white : QueueBStyle.muted,
-                  ),
-                ),
-                title: Text(
-                  adminSectionTitle(i),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: selected == i
-                        ? FontWeight.w600
-                        : FontWeight.w500,
-                    color: selected == i ? Colors.white : QueueBStyle.muted,
-                  ),
-                ),
-                onTap: onSelect == null ? null : () => onSelect!(i),
-              ),
+          const Divider(height: 14, indent: 6, endIndent: 6),
+        for (final i in group.$2) ...[
+          _AdminNavigationItem(
+            title: adminSectionTitle(i),
+            icon: i == -1 ? Icons.dashboard_outlined : adminIcon(i),
+            selected: selected == i,
+            collapsed: collapsed,
+            onTap: onSelect == null ? null : () => onSelect!(i),
+          ),
+          if (i == -1 && onSetup != null)
+            _AdminNavigationItem(
+              title: 'Kelola Layanan Terpadu',
+              icon: Icons.layers_outlined,
+              collapsed: collapsed,
+              onTap: onSelect == null ? null : onSetup,
             ),
+        ],
       ],
       if (onProfile != null) ...[
-        const Divider(height: 24),
-        Tooltip(
-          message: 'Profil akun',
-          child: collapsed
-              ? IconButton(
-                  onPressed: onProfile,
-                  icon: const Icon(Icons.person_outline),
-                  tooltip: 'Profil Saya',
-                )
-              : TextButton.icon(
-                  onPressed: onProfile,
-                  icon: const Icon(Icons.person_outline, size: 20),
-                  label: const Text('Profil Saya'),
-                ),
+        const Divider(height: 24, indent: 6, endIndent: 6),
+        _AdminNavigationItem(
+          title: 'Profil Saya',
+          icon: Icons.account_circle_outlined,
+          collapsed: collapsed,
+          onTap: onProfile,
         ),
       ],
     ],
   );
+}
+
+class _AdminNavigationItem extends StatelessWidget {
+  const _AdminNavigationItem({
+    required this.title,
+    required this.icon,
+    required this.collapsed,
+    this.selected = false,
+    this.onTap,
+  });
+
+  final String title;
+  final IconData icon;
+  final bool collapsed, selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = selected
+        ? Colors.white
+        : onTap == null
+        ? QueueBStyle.muted.withValues(alpha: .6)
+        : QueueBStyle.navy;
+    final item = Semantics(
+      button: true,
+      selected: selected,
+      enabled: onTap != null,
+      label: collapsed ? title : null,
+      child: Material(
+        color: selected ? QueueBStyle.teal : Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          canRequestFocus: onTap != null,
+          borderRadius: BorderRadius.circular(8),
+          hoverColor: selected
+              ? Colors.white.withValues(alpha: .1)
+              : QueueBStyle.mint,
+          focusColor: selected
+              ? Colors.white.withValues(alpha: .2)
+              : QueueBStyle.teal.withValues(alpha: .12),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: collapsed ? 0 : 12,
+                vertical: 10,
+              ),
+              child: Row(
+                mainAxisAlignment: collapsed
+                    ? MainAxisAlignment.center
+                    : MainAxisAlignment.start,
+                children: [
+                  ExcludeSemantics(
+                    child: Icon(icon, size: 20, color: foreground),
+                  ),
+                  if (!collapsed) ...[
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 13,
+                          height: 1.4,
+                          fontWeight: selected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: foreground,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 3),
+      child: collapsed
+          ? Tooltip(message: title, excludeFromSemantics: true, child: item)
+          : item,
+    );
+  }
 }

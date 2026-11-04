@@ -76,15 +76,17 @@ class PatientBottomNavigation extends StatelessWidget {
     super.key,
     required this.selectedIndex,
     this.onSelected,
+    this.maxWidth = 680,
   });
   final int selectedIndex;
   final ValueChanged<int>? onSelected;
+  final double maxWidth;
 
   @override
   Widget build(BuildContext context) => Align(
     heightFactor: 1,
     child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 680),
+      constraints: BoxConstraints(maxWidth: maxWidth),
       child: DecoratedBox(
         decoration: const BoxDecoration(
           color: PatientDesign.paper,
@@ -96,7 +98,7 @@ class PatientBottomNavigation extends StatelessWidget {
             data: NavigationBarTheme.of(context).copyWith(
               iconTheme: WidgetStateProperty.resolveWith(
                 (states) => IconThemeData(
-                  size: 25,
+                  size: 23,
                   color: states.contains(WidgetState.selected)
                       ? activeColor
                       : PatientDesign.muted,
@@ -122,18 +124,18 @@ class PatientBottomNavigation extends StatelessWidget {
                 QueueBMotion.component,
               ),
               backgroundColor: PatientDesign.paper,
-              indicatorColor: const Color(0xffe9f2ff),
+              indicatorColor: Colors.transparent,
               selectedIndex: selectedIndex,
               onDestinationSelected: onSelected,
               destinations: const [
                 NavigationDestination(
                   icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home),
+                  selectedIcon: Icon(Icons.home_outlined),
                   label: 'Beranda',
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.calendar_month_outlined),
-                  selectedIcon: Icon(Icons.calendar_month_rounded),
+                  icon: Icon(Icons.event_available_outlined),
+                  selectedIcon: Icon(Icons.event_available_outlined),
                   label: 'Reservasi',
                 ),
                 NavigationDestination(
@@ -142,7 +144,7 @@ class PatientBottomNavigation extends StatelessWidget {
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.person_outline),
-                  selectedIcon: Icon(Icons.person),
+                  selectedIcon: Icon(Icons.person_outline),
                   label: 'Profil',
                 ),
               ],
@@ -267,9 +269,13 @@ class PatientNativeHomeTabs extends StatefulWidget {
     required this.headerSlivers,
     required this.walkInSlivers,
     required this.appointmentSlivers,
+    this.tabsFirst = false,
+    this.nestedScrollKey,
   });
 
   final bool walkInSelected;
+  final bool tabsFirst;
+  final GlobalKey<NestedScrollViewState>? nestedScrollKey;
   final ValueChanged<bool>? onChanged;
   final List<Widget> headerSlivers;
   final List<Widget> walkInSlivers;
@@ -319,98 +325,171 @@ class _PatientNativeHomeTabsState extends State<PatientNativeHomeTabs>
   }
 
   @override
-  Widget build(BuildContext context) {
-    final enabled = widget.onChanged != null;
-    return NestedScrollView(
-      // Keep search and visit card shared above both native Flutter tabs.
-      headerSliverBuilder: (context, innerBoxIsScrolled) => [
-        ...widget.headerSlivers,
-        SliverOverlapAbsorber(
-          handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context),
-          sliver: SliverPersistentHeader(
-            pinned: true,
-            delegate: _PatientNativeTabHeader(
-              child: Material(
-                color: PatientDesign.background,
-                child: IgnorePointer(
-                  ignoring: !enabled,
-                  child: TabBar(
-                    controller: _controller,
-                    labelColor: PatientDesign.primary,
-                    unselectedLabelColor: PatientDesign.muted,
-                    dividerColor: PatientDesign.border,
-                    indicatorColor: PatientDesign.primary,
-                    indicatorWeight: 3,
-                    labelStyle: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, bounds) {
+      final enabled = widget.onChanged != null;
+      final scaler = MediaQuery.textScalerOf(context);
+      final verticalLabel = scaler.scale(13) > 21;
+      final labelStyle =
+          Theme.of(context).textTheme.labelLarge
+              ?.copyWith(fontSize: 13, fontWeight: FontWeight.w600) ??
+          const TextStyle(fontSize: 13, fontWeight: FontWeight.w600);
+      // Measure the labels instead of limiting text scaling or assuming that
+      // every language/font setting fits a single fixed-height tab.
+      final tabWidth = ((bounds.maxWidth - 32) / 2 - 16)
+          .clamp(1.0, double.infinity)
+          .toDouble();
+      final labelWidth = (tabWidth - (verticalLabel ? 0 : 27))
+          .clamp(1.0, double.infinity)
+          .toDouble();
+      double labelHeight = 0;
+      for (final label in const ['Ambil Antrean', 'Janji Temu']) {
+        final painter = TextPainter(
+          text: TextSpan(text: label, style: labelStyle),
+          textDirection: Directionality.of(context),
+          textScaler: scaler,
+        )..layout(maxWidth: labelWidth);
+        if (painter.height > labelHeight) labelHeight = painter.height;
+        painter.dispose();
+      }
+      final tabHeight = (labelHeight + (verticalLabel ? 26 : 0) + 20)
+          .clamp(48.0, double.infinity)
+          .toDouble();
+      Widget tab(String label, IconData icon, String key) {
+        final title = Text(label, textAlign: TextAlign.center);
+        return Tab(
+          key: ValueKey(key),
+          height: tabHeight,
+          child: verticalLabel
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 18),
+                    const SizedBox(height: 8),
+                    title,
+                  ],
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, size: 18),
+                    const SizedBox(width: 6),
+                    Flexible(child: title),
+                  ],
+                ),
+        );
+      }
+
+      final tabsSurface = Material(
+        color: PatientDesign.background,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Material(
+            color: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: const BorderSide(color: PatientDesign.border),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: AbsorbPointer(
+              absorbing: !enabled,
+              child: ExcludeFocus(
+                excluding: !enabled,
+                child: TabBar(
+                  controller: _controller,
+                  labelColor: PatientDesign.primary,
+                  unselectedLabelColor: PatientDesign.muted,
+                  dividerColor: Colors.transparent,
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 8),
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  indicator: const UnderlineTabIndicator(
+                    borderSide: BorderSide(
+                      color: PatientDesign.primary,
+                      width: 2,
                     ),
-                    unselectedLabelStyle: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    tabs: const [
-                      Tab(
-                        key: ValueKey('home-mode-walkIn'),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.groups_outlined, size: 18),
-                            SizedBox(width: 7),
-                            Flexible(child: Text('Ambil Antrean')),
-                          ],
-                        ),
-                      ),
-                      Tab(
-                        key: ValueKey('home-mode-appointment'),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.calendar_month_outlined, size: 18),
-                            SizedBox(width: 7),
-                            Flexible(child: Text('Janji Temu')),
-                          ],
-                        ),
-                      ),
-                    ],
+                    insets: EdgeInsets.symmetric(horizontal: 16),
                   ),
+                  labelStyle: labelStyle,
+                  unselectedLabelStyle: labelStyle.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                  tabs: [
+                    tab(
+                      'Ambil Antrean',
+                      Icons.confirmation_number_outlined,
+                      'home-mode-walkIn',
+                    ),
+                    tab(
+                      'Janji Temu',
+                      Icons.calendar_month_outlined,
+                      'home-mode-appointment',
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
         ),
-      ],
-      body: ScrollConfiguration(
-        behavior: ScrollConfiguration.of(context).copyWith(
-          dragDevices: {
-            ...ScrollConfiguration.of(context).dragDevices,
-            PointerDeviceKind.mouse,
-          },
-        ),
-        child: TabBarView(
-          key: const ValueKey('patient-home-tab-pages'),
-          controller: _controller,
-          physics: enabled
-              ? const PageScrollPhysics()
-              : const NeverScrollableScrollPhysics(),
-          children: [
-            _PatientNativeTabBody(
-              key: const PageStorageKey('patient-home-walk-in'),
-              scrollKey: const PageStorageKey('patient-home-walk-in-scroll'),
-              slivers: widget.walkInSlivers,
-            ),
-            _PatientNativeTabBody(
-              key: const PageStorageKey('patient-home-appointments'),
-              scrollKey: const PageStorageKey(
-                'patient-home-appointments-scroll',
+      );
+      final scrollView = NestedScrollView(
+        key: widget.nestedScrollKey,
+        // Search and visit keep a single shared owner. In tabs-first mode the
+        // fixed tab surface sits outside this coordinated scrolling viewport.
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          ...widget.headerSlivers,
+          SliverOverlapAbsorber(
+            handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context),
+            sliver: widget.tabsFirst
+                ? const SliverToBoxAdapter(child: SizedBox.shrink())
+                : SliverPersistentHeader(
+                    pinned: true,
+                    delegate: _PatientNativeTabHeader(
+                      height: tabHeight + 16,
+                      child: tabsSurface,
+                    ),
+                  ),
+          ),
+        ],
+        body: ScrollConfiguration(
+          behavior: ScrollConfiguration.of(context).copyWith(
+            dragDevices: {
+              ...ScrollConfiguration.of(context).dragDevices,
+              PointerDeviceKind.mouse,
+            },
+          ),
+          child: TabBarView(
+            key: const ValueKey('patient-home-tab-pages'),
+            controller: _controller,
+            physics: enabled
+                ? const PageScrollPhysics()
+                : const NeverScrollableScrollPhysics(),
+            children: [
+              _PatientNativeTabBody(
+                key: const PageStorageKey('patient-home-walk-in'),
+                scrollKey: const PageStorageKey('patient-home-walk-in-scroll'),
+                slivers: widget.walkInSlivers,
               ),
-              slivers: widget.appointmentSlivers,
-            ),
-          ],
+              _PatientNativeTabBody(
+                key: const PageStorageKey('patient-home-appointments'),
+                scrollKey: const PageStorageKey(
+                  'patient-home-appointments-scroll',
+                ),
+                slivers: widget.appointmentSlivers,
+              ),
+            ],
+          ),
         ),
-      ),
-    );
-  }
+      );
+      return widget.tabsFirst
+          ? Column(
+              children: [
+                SizedBox(height: tabHeight + 16, child: tabsSurface),
+                Expanded(child: scrollView),
+              ],
+            )
+          : scrollView;
+    },
+  );
 }
 
 class _PatientNativeTabBody extends StatelessWidget {
@@ -435,13 +514,14 @@ class _PatientNativeTabBody extends StatelessWidget {
 }
 
 class _PatientNativeTabHeader extends SliverPersistentHeaderDelegate {
-  const _PatientNativeTabHeader({required this.child});
+  const _PatientNativeTabHeader({required this.child, required this.height});
   final Widget child;
+  final double height;
 
   @override
-  double get minExtent => 49;
+  double get minExtent => height;
   @override
-  double get maxExtent => 49;
+  double get maxExtent => height;
   @override
   Widget build(
     BuildContext context,
@@ -450,7 +530,7 @@ class _PatientNativeTabHeader extends SliverPersistentHeaderDelegate {
   ) => child;
   @override
   bool shouldRebuild(covariant _PatientNativeTabHeader oldDelegate) =>
-      oldDelegate.child != child;
+      oldDelegate.child != child || oldDelegate.height != height;
 }
 
 class PatientHeading extends StatelessWidget {

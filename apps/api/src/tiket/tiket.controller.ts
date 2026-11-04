@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Header,
   Param,
   ParseUUIDPipe,
   UseGuards,
@@ -28,6 +29,16 @@ export class TiketController {
   @Get('saya')
   findAll(@CurrentUser() user: AuthenticatedUser) {
     return this.tiketService.findAll(user.id);
+  }
+
+  // Read-only dispatch metadata for one owned ticket, never other patient rows.
+  @Get(':id/dispatch')
+  @Header('Cache-Control', 'no-store')
+  dispatch(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.tiketService.dispatch(id, user.id);
   }
 
   // Detail tiket berdasarkan UUID.

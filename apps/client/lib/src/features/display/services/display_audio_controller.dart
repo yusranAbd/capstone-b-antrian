@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
+import '../../../app_brand.dart';
+
 abstract interface class DisplaySpeechEngine {
   void errors(void Function(dynamic)? callback);
   Future<dynamic> stop();
@@ -137,7 +139,7 @@ class DisplayAudioController extends ChangeNotifier {
         _epoch++;
         await _stop();
       } else if (await (_speechPending = _speak(
-        'Suara pengumuman QueueB aktif.',
+        'Suara pengumuman ${AppBrand.name} aktif.',
       ))) {
         if (!_disposed && _active && _epoch == epoch + 1) {
           enabled = true;

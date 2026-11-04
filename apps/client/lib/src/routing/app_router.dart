@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../app_brand.dart';
 import '../api.dart';
 import '../app.dart';
 import '../admin.dart';
@@ -345,7 +346,7 @@ class AppRouting {
   }
 
   Widget _feedback(BuildContext context, bool forbidden) => Scaffold(
-    appBar: AppBar(title: const Text('QueueB Hospital')),
+    appBar: AppBar(title: const Text(AppBrand.name)),
     body: Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,

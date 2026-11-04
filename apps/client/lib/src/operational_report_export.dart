@@ -6,6 +6,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import 'app_brand.dart';
 import 'config.dart';
 
 String reportMinutes(Object? seconds) =>
@@ -34,7 +35,7 @@ bool get reportCsvSupported =>
 String _filename(Json report, String extension) {
   final period = object(report['periode']);
   String safe(Object? v) => '$v'.replaceAll(RegExp('[^a-zA-Z0-9_-]'), '_');
-  return 'QueueB_Laporan_${safe(period['mulai'])}_${safe(period['selesai'])}.$extension';
+  return '${AppBrand.filePrefix}_Laporan_${safe(period['mulai'])}_${safe(period['selesai'])}.$extension';
 }
 
 /// Quote every string and neutralize spreadsheet formula prefixes, including whitespace.
@@ -131,8 +132,8 @@ Future<Uint8List> operationalReportPdf(Json report) async {
     );
   }
   final document = pw.Document(
-    title: 'Laporan Operasional QueueB Hospital',
-    author: 'QueueB Hospital',
+    title: 'Laporan Operasional ${AppBrand.name}',
+    author: AppBrand.name,
   );
   String value(Object? v) => v == null ? '-' : '$v';
   pw.Widget table(List<String> headers, List<List<String>> values) =>
@@ -152,13 +153,13 @@ Future<Uint8List> operationalReportPdf(Json report) async {
       footer: (context) => pw.Align(
         alignment: pw.Alignment.centerRight,
         child: pw.Text(
-          'QueueB Hospital | ${context.pageNumber}/${context.pagesCount}',
+          '${AppBrand.name} | ${context.pageNumber}/${context.pagesCount}',
           style: const pw.TextStyle(fontSize: 8),
         ),
       ),
       build: (_) => [
         pw.Text(
-          'QueueB Hospital - Laporan Operasional',
+          '${AppBrand.name} - Laporan Operasional',
           style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
         ),
         pw.SizedBox(height: 8),

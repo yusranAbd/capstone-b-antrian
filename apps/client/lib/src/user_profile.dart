@@ -5,6 +5,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'app_brand.dart';
 import 'features/account/application/account_profile_cubit.dart';
 import 'features/account/data/account_profile_repository.dart';
 
@@ -507,7 +508,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
         info('Peran akun', accountRole(role)),
         if (role == 'ADMIN')
           const Text(
-            'Administrator mengelola master data dan kesiapan layanan QueueB Hospital.',
+            'Administrator mengelola master data dan kesiapan layanan ${AppBrand.name}.',
           ),
         if (role == 'USER') ...[
           const Text(

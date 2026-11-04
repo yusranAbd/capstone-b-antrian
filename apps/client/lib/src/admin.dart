@@ -14,6 +14,7 @@ import 'admin_navigation.dart';
 import 'admin_insights.dart';
 import 'admin_ui.dart';
 import 'admin_dashboard.dart';
+import 'operational_report_export.dart';
 import 'features/insights/insights_cubit.dart';
 import 'admin_schedules.dart';
 import 'admin_staff.dart';
@@ -61,6 +62,7 @@ class _AdminPageState extends State<AdminPage> {
   int get selected => widget.section ?? _selected;
   int staffTab = 0;
   bool collapsed = false;
+  bool dashboardExporting = false;
   late final AdminCatalogRepository catalogRepository;
   late final InsightsCubit dashboardActivity;
   late final List<AdminCatalogCubit> catalogCubits;
@@ -641,6 +643,12 @@ class _AdminPageState extends State<AdminPage> {
           height: MediaQuery.sizeOf(context).height * .8,
           child: AdminNavigation(
             selected: selected,
+            onSetup: loading
+                ? null
+                : () {
+                    Navigator.pop(sheetContext);
+                    openIntegratedServiceSetup();
+                  },
             onProfile: widget.onProfile == null
                 ? null
                 : () {
@@ -657,6 +665,33 @@ class _AdminPageState extends State<AdminPage> {
         ),
       ),
     );
+  }
+
+  Future<void> exportDashboard() async {
+    final snapshot = dashboardActivity.state.data;
+    if (snapshot == null || dashboardExporting || !dashboardActivity.active) {
+      return;
+    }
+    final period = object(snapshot['periode']);
+    if (period['mulai'] != widget.api.config.today ||
+        period['selesai'] != widget.api.config.today) {
+      return;
+    }
+    bool current() =>
+        mounted &&
+        selected == -1 &&
+        dashboardActivity.active &&
+        identical(dashboardActivity.state.data, snapshot);
+    setState(() => dashboardExporting = true);
+    try {
+      await shareOperationalPdf(snapshot, current: current);
+    } catch (_) {
+      if (current()) {
+        setState(() => error = 'Laporan belum dapat diekspor. Coba lagi.');
+      }
+    } finally {
+      if (mounted) setState(() => dashboardExporting = false);
+    }
   }
 
   @override
@@ -733,6 +768,8 @@ class _AdminPageState extends State<AdminPage> {
               administratorName: widget.api.user?['nama'] as String?,
               onRefresh: () => load(reloadCatalog: true),
               onSetup: openIntegratedServiceSetup,
+              onExport: exportDashboard,
+              exporting: dashboardExporting,
               catalog: catalog,
               config: widget.api.config,
               loading: loading,
@@ -867,11 +904,14 @@ class _AdminPageState extends State<AdminPage> {
                 ? Row(
                     children: [
                       SizedBox(
-                        width: collapsed ? 72 : 232,
+                        width: collapsed ? 72 : 248,
                         child: Material(
                           color: Colors.white,
                           child: AdminNavigation(
                             selected: selected,
+                            onSetup: loading
+                                ? null
+                                : openIntegratedServiceSetup,
                             onProfile: widget.onProfile,
                             onSelect: navigationLocked ? null : selectResource,
                             collapsed: collapsed,
@@ -1303,7 +1343,7 @@ class _AdminEditorState extends State<_AdminEditor> {
           Text('${editing ? 'Ubah' : 'Tambah'} ${widget.resource.title}'),
           const SizedBox(height: 8),
           const Text(
-            'Kelola data layanan rumah sakit. Periksa isian sebelum menyimpan.',
+            'Kelola data layanan klinik. Periksa isian sebelum menyimpan.',
             style: TextStyle(fontSize: 13),
           ),
         ],

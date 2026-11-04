@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -28,12 +29,14 @@ import 'patient_design.dart';
 import 'patient_agenda.dart';
 import 'patient_sync.dart';
 import 'doctor_schedule_ui.dart';
+import 'patient_doctor_detail_ui.dart';
 import 'doctor_professional.dart';
 import 'patient_ui.dart';
 import 'queueb_motion.dart';
 import 'queueb_interaction_motion.dart';
 import 'queueb_content_motion.dart';
 import 'patient_home.dart';
+import 'patient_home_appointment_card.dart';
 import 'patient_home_v6.dart';
 import 'patient_home_v7.dart';
 import 'patient_home_v8.dart';
@@ -42,6 +45,7 @@ import 'patient_navigation.dart';
 import 'user_profile.dart';
 import 'patient_reservations.dart';
 import 'patient_ticket_pdf.dart';
+import 'patient_ticket_dispatch_ui.dart';
 import 'patient_notifications.dart';
 import 'patient_mobile_v5.dart';
 import 'patient_scroll_shell.dart';
@@ -159,6 +163,7 @@ class _PatientPageState extends State<PatientPage> {
 
   PatientHomeMode homeMode = PatientHomeMode.walkIn;
   final homeSearch = TextEditingController();
+  final _homeNestedScrollKey = GlobalKey<NestedScrollViewState>();
   String? homeClinicId;
   List<Json> get clinicSchedules => booking.state.rows('clinicSchedules');
   set clinicSchedules(List<Json> value) =>
@@ -436,6 +441,65 @@ class _PatientPageState extends State<PatientPage> {
 
   Future<void> loadSlots(String id) => booking.loadSlots(id);
 
+  bool get _showDoctorDetail =>
+      tab == 2 &&
+      reservationCreating &&
+      bookingStage &&
+      doctorDetail &&
+      serviceId != null &&
+      doctorId != null;
+
+  bool get _compactPatientPage =>
+      tab == 0 || _showDoctorDetail || (tab == 2 && !reservationCreating);
+
+  /// One selection predicate drives both the summary and the fixed action.
+  /// The existing booking Cubit still validates again before confirmation.
+  Json? get _selectedDoctorSlot {
+    if (!appointment ||
+        !schedules.any(
+          (session) =>
+              session['id'] == sessionId &&
+              session['aktif'] != false &&
+              dateOnly(session['tanggal']) == date.text.trim(),
+        )) {
+      return null;
+    }
+    return slots
+        .where(
+          (slot) =>
+              slot['id'] == slotId &&
+              slot['aktif'] != false &&
+              slot['tersedia'] == true &&
+              !(slot['sisaKapasitas'] is num && slot['sisaKapasitas'] <= 0),
+        )
+        .firstOrNull;
+  }
+
+  Widget _doctorBookingBar(BuildContext context) {
+    final slot = _selectedDoctorSlot;
+    final localTime = slot == null
+        ? null
+        : widget.api.config.localInput(slot['mulaiPada']).split('T').last;
+    return PatientDoctorBookingBar(
+      dateLabel: slot == null
+          ? 'Pilih tanggal & jam'
+          : patientCompactDate(date.text),
+      timeLabel: slot == null
+          ? 'Belum ada slot dipilih'
+          : '$localTime ${patientHomeTimeZone(widget.api.config.serviceTimeZone)}',
+      busy: busy,
+      onConfirm:
+          busy ||
+              loading ||
+              _routeLoading ||
+              _routeError != null ||
+              error != null ||
+              slot == null
+          ? null
+          : book,
+    );
+  }
+
   Future<void> book() async {
     if (busy || reviewing) return;
     PatientBookingRequest request;
@@ -542,11 +606,13 @@ class _PatientPageState extends State<PatientPage> {
       await showDialog<void>(
         context: context,
         barrierDismissible: false,
+        animationStyle: QueueBMotion.modalStyle(context),
         builder: (context) => _TicketDialog(
           api: widget.api,
           repository: repository,
           ticket: ticket,
           issueQrOnOpen: issueQrOnOpen,
+          onManage: showReservations,
           appointment: appointments
               .where((a) => object(a['tiket'])['id'] == ticket['id'])
               .firstOrNull,
@@ -856,6 +922,17 @@ class _PatientPageState extends State<PatientPage> {
         .where((a) => object(a['tiket'])['id'] == active?['id'])
         .firstOrNull;
     final appointmentClinics = services.where(supportsHomeAppointment).toList();
+    final directoryAvailable = const ['/dokter', '/layanan', '/jadwal-praktik']
+        .every(
+          (path) =>
+              overviewCubit.state.snapshot.collections.containsKey(path) &&
+              !overviewCubit.state.errors.containsKey(path),
+        );
+    final directoryError =
+        homeScheduleError ??
+        (!loading && !directoryAvailable
+            ? 'Daftar dokter atau layanan belum dapat dimuat. Silakan muat ulang.'
+            : null);
     final previews = homeDoctorPreviews(
       doctors,
       appointmentClinics,
@@ -871,6 +948,8 @@ class _PatientPageState extends State<PatientPage> {
       _entranceServices ??= walkIns.take(5).map((s) => '${s['id']}').toList();
     }
     return PatientNativeHomeTabs(
+      tabsFirst: false,
+      nestedScrollKey: _homeNestedScrollKey,
       walkInSelected: homeMode == PatientHomeMode.walkIn,
       onChanged: busy
           ? null
@@ -883,7 +962,7 @@ class _PatientPageState extends State<PatientPage> {
             }),
       headerSlivers: [
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           sliver: SliverToBoxAdapter(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -896,7 +975,8 @@ class _PatientPageState extends State<PatientPage> {
                   listenable: widget.api,
                   builder: (_, _) => PatientHomeWelcomeV8(
                     name: '${widget.api.user?['nama'] ?? 'Pasien'}',
-                    now: DateTime.now(),
+                    now: widget.api.config.now,
+                    appointmentMode: homeMode != PatientHomeMode.walkIn,
                     controller: homeSearch,
                     onSearch: (v) =>
                         setState(() => homeQuery = v.toLowerCase().trim()),
@@ -928,7 +1008,7 @@ class _PatientPageState extends State<PatientPage> {
                         )
                       : const SizedBox.shrink(),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 PatientHomeVisitV8(
                   ticket: active,
                   appointment: visit,
@@ -939,7 +1019,7 @@ class _PatientPageState extends State<PatientPage> {
                       ? null
                       : () => openTicket(active),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 4),
               ],
             ),
           ),
@@ -947,7 +1027,30 @@ class _PatientPageState extends State<PatientPage> {
       ],
       walkInSlivers: [
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 2),
+          sliver: SliverToBoxAdapter(
+            child: ValueListenableBuilder<PatientQueueState>(
+              valueListenable: overviewCubit.queueState,
+              builder: (context, queue, _) => PatientHomeListHeading(
+                title: 'Daftar Antrean Langsung',
+                caption: 'Walk-in',
+                showLive: !loading && walkIns.isNotEmpty,
+                live:
+                    walkIns.isNotEmpty &&
+                    walkIns.every(
+                      (service) => queue
+                          .forService(
+                            '${service['id']}',
+                            widget.api.config.today,
+                          )
+                          .live,
+                    ),
+              ),
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
           sliver: loading
               ? const SliverToBoxAdapter(child: PatientHomeLoading())
               : walkIns.isEmpty
@@ -964,46 +1067,83 @@ class _PatientPageState extends State<PatientPage> {
                       padding: const EdgeInsets.only(bottom: 8),
                       child: ValueListenableBuilder<PatientQueueState>(
                         valueListenable: overviewCubit.queueState,
-                        builder: (context, queue, _) => PatientHomeService(
-                          clinic: walkIns[index],
-                          hours: patientServiceHours(
-                            serviceHours,
-                            '${walkIns[index]['id']}',
-                            widget.api.config.today,
-                            available: hoursAvailable,
-                          ),
-                          staffName: patientServiceProviderLabel(
-                            doctors: doctors,
-                            sessions: homeSchedules,
-                            serviceId: '${walkIns[index]['id']}',
-                            date: widget.api.config.today,
-                          ),
-                          queue: queue.forService(
-                            '${walkIns[index]['id']}',
-                            widget.api.config.today,
-                          ),
-                          ticket: homeServiceTicket(
+                        builder: (context, queue, _) {
+                          final ownTicket = homeServiceTicket(
                             tickets,
                             '${walkIns[index]['id']}',
                             widget.api.config.today,
                             widget.api.user?['id']?.toString(),
-                          ),
-                          onTap: busy
-                              ? null
-                              : () {
-                                  startRegistration(false);
-                                  selectService('${walkIns[index]['id']}');
-                                },
-                        ),
+                          );
+                          return PatientHomeService(
+                            clinic: walkIns[index],
+                            hours: patientServiceHours(
+                              serviceHours,
+                              '${walkIns[index]['id']}',
+                              widget.api.config.today,
+                              available: hoursAvailable,
+                            ),
+                            timeZoneLabel: patientHomeTimeZone(
+                              widget.api.config.serviceTimeZone,
+                            ),
+                            staffName: patientServiceProviderLabel(
+                              doctors: doctors,
+                              sessions: homeSchedules,
+                              serviceId: '${walkIns[index]['id']}',
+                              date: widget.api.config.today,
+                            ),
+                            queue: queue.forService(
+                              '${walkIns[index]['id']}',
+                              widget.api.config.today,
+                            ),
+                            ticket: ownTicket,
+                            onTap: busy
+                                ? null
+                                : () {
+                                    if (ownTicket != null) {
+                                      openTicket(ownTicket);
+                                      return;
+                                    }
+                                    startRegistration(false);
+                                    selectService('${walkIns[index]['id']}');
+                                  },
+                          );
+                        },
                       ),
                     ),
                   ),
                 ),
         ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.sync_rounded,
+                  size: 17,
+                  color: PatientDesign.muted,
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    'Data antrean diperbarui otomatis · Waktu layanan ${patientHomeTimeZone(widget.api.config.serviceTimeZone)}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      height: 1.5,
+                      color: PatientDesign.muted,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
       appointmentSlivers: [
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
           sliver: SliverToBoxAdapter(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1013,18 +1153,32 @@ class _PatientPageState extends State<PatientPage> {
                   child: Row(
                     children: [
                       for (final clinic in <Json>[
-                        {'nama': 'Semua'},
+                        {'nama': 'Semua layanan'},
                         ...appointmentClinics,
                       ])
                         Padding(
-                          padding: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.only(right: 6),
                           child: ChoiceChip(
                             label: Text(label(clinic)),
                             selected: clinic['id'] == homeClinicId,
                             showCheckmark: false,
                             selectedColor: PatientDesign.primary,
+                            backgroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            side: BorderSide(
+                              color: clinic['id'] == homeClinicId
+                                  ? PatientDesign.primary
+                                  : PatientDesign.border,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
                             labelStyle: TextStyle(
                               fontSize: 12,
+                              fontWeight: FontWeight.w500,
                               color: clinic['id'] == homeClinicId
                                   ? Colors.white
                                   : PatientDesign.ink,
@@ -1040,26 +1194,27 @@ class _PatientPageState extends State<PatientPage> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 6),
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Text(
-                    'Dokter hari ini',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: PatientDesign.navy,
-                    ),
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: PatientHomeListHeading(
+                    title: 'Dokter Hari Ini',
+                    caption: loading
+                        ? 'Memuat jadwal…'
+                        : !directoryAvailable
+                        ? 'Data dokter belum tersedia'
+                        : '${previews.length} dokter · ${patientCompactDate(widget.api.config.today)}',
                   ),
                 ),
-                if (homeScheduleError != null)
+                if (directoryError != null)
                   PatientHomeEmpty(
-                    text: homeScheduleError!,
+                    text: directoryError,
                     action: 'Muat ulang jadwal',
                     onPressed: busy || loading ? null : load,
                   ),
                 if (loading)
                   const PatientHomeLoading()
-                else if (homeScheduleError == null && previews.isEmpty)
+                else if (directoryAvailable && previews.isEmpty)
                   PatientHomeEmpty(
                     text: homeQuery.isEmpty && homeClinicId == null
                         ? 'Belum ada dokter dengan jadwal praktik hari ini.'
@@ -1069,14 +1224,14 @@ class _PatientPageState extends State<PatientPage> {
             ),
           ),
         ),
-        if (!loading && homeScheduleError == null)
+        if (!loading && directoryAvailable)
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
             sliver: SliverList.builder(
               itemCount: previews.length,
               itemBuilder: (context, index) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: PatientHomeDoctorV6(
+                child: PatientHomeAppointmentCard(
                   preview: previews[index],
                   config: widget.api.config,
                   scheduleUnavailable: homeScheduleError != null,
@@ -1109,6 +1264,14 @@ class _PatientPageState extends State<PatientPage> {
               ),
             ),
           ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          sliver: SliverToBoxAdapter(
+            child: PatientHomeOtherSchedules(
+              onOpen: busy || loading ? null : createReservation,
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -1164,9 +1327,25 @@ class _PatientPageState extends State<PatientPage> {
               child: PatientScrollShell(
                 pageKey:
                     '$tab:${tab == 0 ? homeMode.name : ''}:$reservationCreating:$serviceId:$bookingStage:$doctorDetail',
-                header: tab == 0
+                header: _showDoctorDetail
+                    ? PatientDoctorDetailHeader(
+                        height: PatientDoctorDetailHeader.heightFor(context),
+                        onBack: busy || loading ? null : _backFromBookingDetail,
+                        avatar: AccountAvatar(api: widget.api, radius: 18),
+                        onProfile: busy || loading
+                            ? null
+                            : () {
+                                if (widget.navigationShell == null) {
+                                  setState(() => tab = 5);
+                                } else {
+                                  _go('/patient/profile');
+                                }
+                              },
+                      )
+                    : tab == 0 || (tab == 2 && !reservationCreating)
                     ? PatientHomeAppBarV8(
                         api: widget.api,
+                        maxWidth: _compactPatientPage ? 480 : 680,
                         height: PatientHomeAppBarV8.heightFor(context),
                         onProfile: () {
                           if (widget.navigationShell == null) {
@@ -1184,46 +1363,42 @@ class _PatientPageState extends State<PatientPage> {
                       )
                     : null,
                 acceptNestedScrolls: tab == 0,
-                floatingActionButton: tab == 2 && !reservationCreating
-                    ? FloatingActionButton.extended(
-                        heroTag: 'create-reservation',
-                        onPressed: busy || loading ? null : createReservation,
-                        backgroundColor: PatientDesign.darkTeal,
-                        foregroundColor: Colors.white,
-                        elevation: 2,
-                        icon: const Icon(Icons.add),
-                        label: const Text(
-                          'Buat Reservasi',
-                          style: TextStyle(fontSize: 13),
-                        ),
+                nestedScrollKey: tab == 0 ? _homeNestedScrollKey : null,
+                activeNestedScrollKey: tab == 0
+                    ? PageStorageKey<String>(
+                        homeMode == PatientHomeMode.walkIn
+                            ? 'patient-home-walk-in-scroll'
+                            : 'patient-home-appointments-scroll',
                       )
                     : null,
-                floatingActionButtonLocation:
-                    FloatingActionButtonLocation.endFloat,
-                bottomNavigationBar: PatientBottomNavigation(
-                  selectedIndex: patientBottomIndex(tab),
-                  onSelected: busy
-                      ? null
-                      : (i) {
-                          if (widget.navigationShell case final shell?) {
-                            reservationFlowVersion++;
-                            booking.invalidateNearest();
-                            if (i == 1) {
-                              showReservations();
-                            } else {
-                              shell.goBranch(patientBottomBranches[i]);
-                            }
-                          } else {
-                            setState(() {
-                              tab = patientBottomTabs[i];
-                              if (tab == 5) profileVisited = true;
-                              reservationFlowVersion++;
-                              booking.invalidateNearest();
-                              if (tab == 2) reservationCreating = false;
-                            });
-                          }
-                        },
-                ),
+                keepBottomNavigationVisible: _showDoctorDetail && appointment,
+                bottomNavigationBar: _showDoctorDetail && appointment
+                    ? _doctorBookingBar(context)
+                    : PatientBottomNavigation(
+                        maxWidth: _compactPatientPage ? 480 : 680,
+                        selectedIndex: patientBottomIndex(tab),
+                        onSelected: busy
+                            ? null
+                            : (i) {
+                                if (widget.navigationShell case final shell?) {
+                                  reservationFlowVersion++;
+                                  booking.invalidateNearest();
+                                  if (i == 1) {
+                                    showReservations();
+                                  } else {
+                                    shell.goBranch(patientBottomBranches[i]);
+                                  }
+                                } else {
+                                  setState(() {
+                                    tab = patientBottomTabs[i];
+                                    if (tab == 5) profileVisited = true;
+                                    reservationFlowVersion++;
+                                    booking.invalidateNearest();
+                                    if (tab == 2) reservationCreating = false;
+                                  });
+                                }
+                              },
+                      ),
                 body: ColoredBox(
                   color: tab == 0
                       ? PatientHomeV8Style.background
@@ -1232,7 +1407,7 @@ class _PatientPageState extends State<PatientPage> {
                     alignment: Alignment.topCenter,
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
-                        maxWidth: tab == 0 ? 680 : 760,
+                        maxWidth: _compactPatientPage ? 480 : 760,
                       ),
                       child:
                           widget.navigationShell ??
@@ -1385,10 +1560,6 @@ class _PatientPageState extends State<PatientPage> {
     final sessionIds = availableSessions.map((s) => '${s['id']}').toSet();
     final selected = sessionId != null && sessionIds.contains(sessionId);
     final availableSlots = selected ? slots : <Json>[];
-    final hasChosenAvailableSlot =
-        selected &&
-        slotId != null &&
-        availableSlots.any((s) => s['id'] == slotId && s['tersedia'] == true);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1403,11 +1574,12 @@ class _PatientPageState extends State<PatientPage> {
           const Text(
             'Pilih sesi praktik',
             style: TextStyle(
+              fontSize: 13,
               fontWeight: FontWeight.w700,
               color: PatientDesign.navy,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
         ],
         // A session is represented exactly once: time, room and its selection.
         for (final session in availableSessions) ...[
@@ -1418,58 +1590,129 @@ class _PatientPageState extends State<PatientPage> {
             style: OutlinedButton.styleFrom(
               alignment: Alignment.centerLeft,
               backgroundColor: sessionId == '${session['id']}'
-                  ? PatientDesign.mint
-                  : Colors.white,
-              padding: const EdgeInsets.all(12),
+                  ? PatientDesign.soft
+                  : PatientHomeV8Style.background,
+              foregroundColor: PatientDesign.ink,
+              side: BorderSide(
+                color: sessionId == '${session['id']}'
+                    ? PatientDesign.primary
+                    : PatientDesign.border,
+              ),
+              minimumSize: const Size(48, 48),
+              padding: const EdgeInsets.all(10),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                PatientInfoRow(
-                  icon: Icons.schedule_outlined,
-                  title: 'Waktu praktik',
-                  value: patientTime(session, widget.api.config),
-                ),
-                const Divider(height: 18),
-                PatientInfoRow(
-                  icon: Icons.room_outlined,
-                  title: 'Ruang / Loket',
-                  value: _doctorRoomLabel(object(session['loket'])),
-                ),
-                if (availableSessions.length > 1) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    sessionId == '${session['id']}'
-                        ? 'Sesi terpilih'
-                        : 'Ketuk untuk melihat slot',
-                    style: const TextStyle(fontSize: 12),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: PatientDesign.soft,
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                ],
+                  child: const Icon(
+                    Icons.wb_twilight_outlined,
+                    color: PatientDesign.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          const Text(
+                            'Sesi praktik',
+                            style: TextStyle(
+                              fontSize: 14,
+                              height: 1.3,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          if (sessionId == '${session['id']}')
+                            const Icon(
+                              Icons.check_circle_outline,
+                              size: 18,
+                              color: PatientDesign.primary,
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${patientTime(session, widget.api.config)} '
+                        '${patientHomeTimeZone(widget.api.config.serviceTimeZone)}',
+                        style: const TextStyle(fontSize: 13, height: 1.35),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _doctorRoomLabel(object(session['loket'])),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          height: 1.35,
+                          color: PatientDesign.muted,
+                        ),
+                      ),
+                      if (availableSessions.length > 1) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          sessionId == '${session['id']}'
+                              ? 'Sesi terpilih'
+                              : 'Ketuk untuk melihat slot',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: PatientDesign.primary,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
         ],
         if (selected && !loading && availableSlots.isEmpty)
           const EmptyState(text: 'Belum ada slot konsultasi pada sesi ini.'),
         if (selected && availableSlots.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          const Text(
-            'Pilih slot konsultasi',
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              color: PatientDesign.navy,
-            ),
+          const SizedBox(height: 2),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              const Text(
+                'Pilih Jam Konsultasi',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: PatientDesign.navy,
+                ),
+              ),
+              Text(
+                patientHomeTimeZone(widget.api.config.serviceTimeZone),
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: PatientDesign.muted,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 4),
           const Text(
             'Ketersediaan mengikuti data terbaru dari server.',
             style: TextStyle(fontSize: 12, color: PatientDesign.muted),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           if (!availableSlots.any((s) => s['tersedia'] == true))
             EmptyState(
               text:
@@ -1487,12 +1730,6 @@ class _PatientPageState extends State<PatientPage> {
             onChanged: (value) => setState(() => slotId = value),
           ),
         ],
-        const SizedBox(height: 12),
-        FilledButton.icon(
-          onPressed: busy || loading || !hasChosenAvailableSlot ? null : book,
-          icon: const Icon(Icons.arrow_forward),
-          label: Text(busy ? 'Memproses…' : 'Lanjutkan Reservasi'),
-        ),
       ],
     );
   }
@@ -1597,6 +1834,20 @@ class _PatientPageState extends State<PatientPage> {
         <String, dynamic>{};
     final dates = practiceDates;
     final clinicName = label(selectedService ?? {});
+    final doctorSessions = clinicSchedules
+        .where(
+          (session) =>
+              session['aktif'] != false &&
+              dateOnly(session['tanggal']).compareTo(widget.api.config.today) >=
+                  0 &&
+              (object(session['dokterLayanan'])['dokterId'] == doctorId ||
+                  object(object(session['dokterLayanan'])['dokter'])['id'] ==
+                      doctorId),
+        )
+        .toList();
+    final scheduleColor = loading || error != null || doctorSessions.isEmpty
+        ? PatientDesign.muted
+        : PatientDesign.success;
     final visibleDoctors = matchingDoctors
         .where(
           (d) =>
@@ -1609,10 +1860,11 @@ class _PatientPageState extends State<PatientPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        PatientHeading(
-          title: bookingStage ? 'Detail Dokter' : clinicName,
-          onBack: busy || loading ? null : _backFromBookingDetail,
-        ),
+        if (!_showDoctorDetail)
+          PatientHeading(
+            title: bookingStage ? 'Detail Dokter' : clinicName,
+            onBack: busy || loading ? null : _backFromBookingDetail,
+          ),
         if (!bookingStage) ...[
           if (selectedService != null) ...[
             SegmentedButton<bool>(
@@ -1664,32 +1916,54 @@ class _PatientPageState extends State<PatientPage> {
           ],
         ],
         if (bookingStage && doctorDetail) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                Icon(
+                  loading ? Icons.schedule_outlined : Icons.circle,
+                  size: loading ? 16 : 9,
+                  color: scheduleColor,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    loading
+                        ? 'MEMUAT JADWAL PRAKTIK'
+                        : error != null
+                        ? 'JADWAL BELUM DAPAT DIMUAT'
+                        : doctorSessions.any(
+                            (session) =>
+                                dateOnly(session['tanggal']) ==
+                                widget.api.config.today,
+                          )
+                        ? 'JADWAL PRAKTIK HARI INI'
+                        : dates.isNotEmpty
+                        ? 'JADWAL PRAKTIK MENDATANG'
+                        : 'JADWAL BELUM TERSEDIA',
+                    style: TextStyle(
+                      fontSize: 11,
+                      height: 1.3,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: .5,
+                      color: scheduleColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
           DoctorProfileCard(
             doctor: doctor,
             config: widget.api.config,
             clinics: clinicName,
             detail: true,
           ),
-          _ExpandablePatientDoctorBiography(
-            key: ValueKey(('doctor-biography', doctorId)),
-            text: doctor['tentangDokter'],
-          ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           _PatientDoctorSchedulePicker(
             key: ValueKey(('doctor-schedule', doctorId)),
             dates: dates,
-            sessions: clinicSchedules
-                .where(
-                  (s) =>
-                      s['aktif'] != false &&
-                      dateOnly(s['tanggal'])
-                              .compareTo(widget.api.config.today) >=
-                          0 &&
-                      (object(s['dokterLayanan'])['dokterId'] == doctorId ||
-                          object(object(s['dokterLayanan'])['dokter'])['id'] ==
-                              doctorId),
-                )
-                .toList(),
+            sessions: doctorSessions,
             value: date.text,
             config: widget.api.config,
             enabled: !busy && !loading,
@@ -1712,7 +1986,13 @@ class _PatientPageState extends State<PatientPage> {
               unawaited(loadSchedules());
             },
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
+          const PatientDoctorArrivalInfo(),
+          const SizedBox(height: 8),
+          _ExpandablePatientDoctorBiography(
+            key: ValueKey(('doctor-biography', doctorId)),
+            text: doctor['tentangDokter'],
+          ),
           if (selectedService?['modeReservasi'] == 'ANTREAN_HARIAN') ...[
             const MobileNotice(
               'Poliklinik ini menggunakan antrean harian, bukan booking slot dokter.',
@@ -1728,10 +2008,13 @@ class _PatientPageState extends State<PatientPage> {
               label: const Text('Daftar antrean poliklinik'),
             ),
           ],
-          OutlinedButton.icon(
-            onPressed: busy || loading ? null : load,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Muat ulang jadwal'),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: busy || loading ? null : load,
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Muat ulang jadwal'),
+            ),
           ),
         ],
         if (selectedService != null && !appointment && !bookingStage) ...[
@@ -1833,22 +2116,31 @@ class _PatientPageState extends State<PatientPage> {
     ],
   );
 
-  Widget _reservationHistory() => ReservationList(
-    items: patientReservations(
-      tickets,
-      appointments,
-      doctors,
-      widget.api.config.today,
+  Widget _reservationHistory() => ValueListenableBuilder<PatientQueueState>(
+    valueListenable: overviewCubit.queueState,
+    builder: (context, queue, _) => ReservationList(
+      items: patientReservations(
+        tickets,
+        appointments,
+        doctors,
+        widget.api.config.today,
+      ),
+      config: widget.api.config,
+      loading: loading,
+      busy: busy,
+      error: error,
+      message: message,
+      queueState: queue,
+      dataAvailable:
+          patientVisitPaths.every(
+            repository.snapshot.collections.containsKey,
+          ) &&
+          !repository.errors.keys.any(patientVisitPaths.contains),
+      onRefresh: load,
+      onCreate: createReservation,
+      onTicket: (r) => openTicket(r.ticket, issueQrOnOpen: !r.terminal),
+      onCancel: (r) => cancel(r.appointment!),
     ),
-    config: widget.api.config,
-    loading: loading,
-    busy: busy,
-    error: error,
-    message: message,
-    onRefresh: load,
-    onCreate: createReservation,
-    onTicket: (r) => openTicket(r.ticket, issueQrOnOpen: !r.terminal),
-    onCancel: (r) => cancel(r.appointment!),
   );
 }
 
@@ -1866,7 +2158,7 @@ class _ExpandablePatientDoctorBiography extends StatefulWidget {
 
 class _ExpandablePatientDoctorBiographyState
     extends State<_ExpandablePatientDoctorBiography> {
-  bool expanded = true;
+  bool expanded = false;
 
   @override
   Widget build(BuildContext context) => AnimatedSize(
@@ -1888,20 +2180,38 @@ class _ExpandablePatientDoctorBiographyState
               ),
             ],
           )
-        : AppCard(
+        : Material(
+            color: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: PatientDesign.border),
+            ),
             child: InkWell(
+              borderRadius: BorderRadius.circular(12),
               onTap: () => setState(() => expanded = true),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Tentang Dokter',
-                      style: Theme.of(context).textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w700),
-                    ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 44),
+                  child: const Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Tentang Dokter',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: PatientDesign.ink,
+                          ),
+                        ),
+                      ),
+                      Icon(Icons.keyboard_arrow_down_rounded, size: 20),
+                    ],
                   ),
-                  const Icon(Icons.keyboard_arrow_down_rounded),
-                ],
+                ),
               ),
             ),
           ),
@@ -1965,6 +2275,8 @@ class _PatientDoctorSchedulePickerState
   ];
 
   String? month;
+  TextScaler? _lastTextScaler;
+  final _daysController = ScrollController();
 
   String _monthOf(String day) => day.substring(0, 7);
 
@@ -1980,32 +2292,85 @@ class _PatientDoctorSchedulePickerState
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final scaler = MediaQuery.textScalerOf(context);
+    if (_lastTextScaler == scaler) return;
+    _lastTextScaler = scaler;
+    _revealSelectedDay();
+  }
+
+  @override
   void didUpdateWidget(covariant _PatientDoctorSchedulePicker oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.value != oldWidget.value && widget.value.length >= 7) {
       month = _monthOf(widget.value);
     }
+    if (widget.value != oldWidget.value ||
+        widget.dates.length != oldWidget.dates.length) {
+      _revealSelectedDay();
+    }
   }
+
+  void _revealSelectedDay() =>
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_daysController.hasClients) return;
+        final visible =
+            widget.dates
+                .toSet()
+                .where((day) => day.length >= 7 && _monthOf(day) == month)
+                .toList()
+              ..sort();
+        final index = visible.indexOf(widget.value);
+        if (index < 0) return;
+        final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+        final width = 60 * scale.clamp(1.0, double.infinity);
+        _daysController.jumpTo(
+          (index * (width + 8)).clamp(
+            0.0,
+            _daysController.position.maxScrollExtent,
+          ),
+        );
+      });
+
+  @override
+  void dispose() {
+    _daysController.dispose();
+    super.dispose();
+  }
+
+  Widget _scheduleCard(Widget child) => Card(
+    color: Colors.white,
+    elevation: 0,
+    margin: EdgeInsets.zero,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+      side: const BorderSide(color: PatientDesign.border),
+    ),
+    child: Padding(padding: const EdgeInsets.all(12), child: child),
+  );
 
   @override
   Widget build(BuildContext context) {
     final days = widget.dates.toSet().toList()..sort();
     final months = days.map(_monthOf).toSet().toList()..sort();
     if (months.isEmpty) {
-      return AppCard(
-        child: Column(
+      return _scheduleCard(
+        Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
               'Jadwal praktik',
-              style: Theme.of(context).textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w800),
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             if (widget.loading)
               const LinearProgressIndicator()
             else
-              const Text('Dokter belum memiliki jadwal praktik mendatang.'),
+              const Text(
+                'Dokter belum memiliki jadwal praktik mendatang.',
+                style: TextStyle(fontSize: 13, height: 1.4),
+              ),
           ],
         ),
       );
@@ -2032,8 +2397,15 @@ class _PatientDoctorSchedulePickerState
           );
     final animation = QueueBMotion.duration(context, QueueBMotion.component);
 
-    return AppCard(
-      child: Column(
+    final textScaler = MediaQuery.textScalerOf(context);
+    final textScale = textScaler.scale(14) / 14;
+    final dayTileHeight =
+        textScaler.scale(12) * 1.25 +
+        textScaler.scale(22) * 1.2 +
+        textScaler.scale(11) * 1.25 +
+        24;
+    return _scheduleCard(
+      Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Wrap(
@@ -2042,55 +2414,81 @@ class _PatientDoctorSchedulePickerState
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Text(
-                'Jadwal praktik',
-                style: Theme.of(context).textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w800),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.calendar_month_outlined,
+                    color: PatientDesign.primary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      'Jadwal Praktik',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               Semantics(
                 label: 'Pilih bulan jadwal praktik',
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: PatientDesign.border),
-                    borderRadius: BorderRadius.circular(12),
+                    color: PatientDesign.soft,
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: chosenMonth,
-                      isDense: true,
-                      icon: const Icon(Icons.keyboard_arrow_down_rounded),
-                      items: [
-                        for (final entry in months)
-                          DropdownMenuItem(
-                            value: entry,
-                            child: Text(
-                              _monthLabel(entry),
-                              style: const TextStyle(fontSize: 13),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: 48,
+                      maxWidth: 132 * textScale.clamp(1.0, double.infinity),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: chosenMonth,
+                        isDense: false,
+                        isExpanded: true,
+                        itemHeight: null,
+                        icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                        items: [
+                          for (final entry in months)
+                            DropdownMenuItem(
+                              value: entry,
+                              child: Text(
+                                _monthLabel(entry),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  height: 1.3,
+                                ),
+                              ),
                             ),
-                          ),
-                      ],
-                      onChanged: !widget.enabled
-                          ? null
-                          : (next) {
-                              if (next == null || next == chosenMonth) return;
-                              final first = days.firstWhere(
-                                (day) => _monthOf(day) == next,
-                              );
-                              setState(() => month = next);
-                              widget.onChanged(first);
-                            },
+                        ],
+                        onChanged: !widget.enabled
+                            ? null
+                            : (next) {
+                                if (next == null || next == chosenMonth) return;
+                                final first = days.firstWhere(
+                                  (day) => _monthOf(day) == next,
+                                );
+                                setState(() => month = next);
+                                widget.onChanged(first);
+                              },
+                      ),
                     ),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 8),
           SizedBox(
-            height: 92,
+            height: dayTileHeight,
             child: ListView.separated(
+              controller: _daysController,
               scrollDirection: Axis.horizontal,
               itemCount: monthDays.length,
               separatorBuilder: (_, _) => const SizedBox(width: 8),
@@ -2099,29 +2497,36 @@ class _PatientDoctorSchedulePickerState
                 final parsed = DateTime.parse(day);
                 final selected = day == selectedDay;
                 return Semantics(
-                  button: true,
                   selected: selected,
                   label:
                       '${_weekdays[parsed.weekday - 1]}, ${patientDate(day)}',
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: !widget.enabled || selected
-                        ? null
-                        : () => widget.onChanged(day),
-                    child: AnimatedContainer(
-                      duration: animation,
-                      curve: Curves.easeOutCubic,
-                      width: 68,
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(
-                        color: selected
+                  child: SizedBox(
+                    width: 60 * textScale.clamp(1.0, double.infinity),
+                    child: OutlinedButton(
+                      onPressed: !widget.enabled || selected
+                          ? null
+                          : () => widget.onChanged(day),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 8,
+                        ),
+                        backgroundColor: selected
                             ? PatientDesign.primary
-                            : PatientDesign.background,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: selected
-                              ? PatientDesign.primary
-                              : PatientDesign.border,
+                            : PatientDesign.soft,
+                        disabledBackgroundColor: selected
+                            ? PatientDesign.primary
+                            : PatientDesign.soft,
+                        foregroundColor: selected
+                            ? Colors.white
+                            : PatientDesign.ink,
+                        disabledForegroundColor: selected
+                            ? Colors.white
+                            : PatientDesign.muted,
+                        side: BorderSide.none,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                       child: Column(
@@ -2131,6 +2536,7 @@ class _PatientDoctorSchedulePickerState
                             _weekdays[parsed.weekday - 1],
                             style: TextStyle(
                               fontSize: 12,
+                              height: 1.25,
                               color: selected
                                   ? Colors.white
                                   : PatientDesign.muted,
@@ -2140,11 +2546,23 @@ class _PatientDoctorSchedulePickerState
                           Text(
                             '${parsed.day}',
                             style: TextStyle(
-                              fontSize: 23,
+                              fontSize: 22,
+                              height: 1.2,
                               fontWeight: FontWeight.w800,
                               color: selected
                                   ? Colors.white
                                   : PatientDesign.navy,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            selected ? 'Terpilih' : 'Jadwal',
+                            style: TextStyle(
+                              fontSize: 11,
+                              height: 1.25,
+                              color: selected
+                                  ? Colors.white
+                                  : PatientDesign.primary,
                             ),
                           ),
                         ],
@@ -2155,7 +2573,7 @@ class _PatientDoctorSchedulePickerState
               },
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 8),
           AnimatedSwitcher(
             duration: animation,
             switchInCurve: Curves.easeOutCubic,
@@ -2163,26 +2581,27 @@ class _PatientDoctorSchedulePickerState
               key: ValueKey(('practice-date', selectedDay)),
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  patientDate(selectedDay),
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: PatientDesign.navy,
+                if (widget.footer == null)
+                  Text(
+                    patientDate(selectedDay),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: PatientDesign.navy,
+                    ),
                   ),
-                ),
                 if (widget.showSessionDetails) ...[
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   if (visibleSessions.isEmpty)
                     const Text('Belum ada sesi pada tanggal ini.')
                   else
                     for (final session in visibleSessions) ...[
                       Container(
                         margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: PatientDesign.border),
                         ),
                         child: Column(
@@ -2193,7 +2612,7 @@ class _PatientDoctorSchedulePickerState
                               title: 'Waktu praktik',
                               value: patientTime(session, widget.config),
                             ),
-                            const Divider(height: 20),
+                            const Divider(height: 12),
                             PatientInfoRow(
                               icon: Icons.room_outlined,
                               title: 'Ruang / Loket',
@@ -2207,10 +2626,7 @@ class _PatientDoctorSchedulePickerState
               ],
             ),
           ),
-          if (widget.footer != null) ...[
-            const SizedBox(height: 12),
-            widget.footer!,
-          ],
+          if (widget.footer != null) widget.footer!,
         ],
       ),
     );
@@ -2324,11 +2740,13 @@ class _PatientTicketRouteState extends State<PatientTicketRoute> {
                     onPressed: () => showDialog<void>(
                       context: context,
                       barrierDismissible: false,
+                      animationStyle: QueueBMotion.modalStyle(context),
                       builder: (_) => _TicketDialog(
                         api: owner.widget.api,
                         repository: owner.repository,
                         ticket: ticket,
                         controller: controller,
+                        onManage: owner.showReservations,
                       ),
                     ),
                     child: const Text('Lihat tiket & QR'),
@@ -2349,6 +2767,7 @@ class _TicketDialog extends StatefulWidget {
     this.appointment,
     this.issueQrOnOpen = false,
     this.controller,
+    this.onManage,
   });
   final QueueApi api;
   final Json ticket;
@@ -2356,6 +2775,7 @@ class _TicketDialog extends StatefulWidget {
   final Json? appointment;
   final bool issueQrOnOpen;
   final PatientTicketCubit? controller;
+  final VoidCallback? onManage;
   @override
   State<_TicketDialog> createState() => _TicketDialogState();
 }
@@ -2369,6 +2789,7 @@ class _TicketDialogState extends State<_TicketDialog> {
   bool get loading => [
     PatientLoad.initial,
     PatientLoad.loading,
+    PatientLoad.refreshing,
   ].contains(controller.state.load);
   Timer? countdown;
   Timer? qrExpiry;
@@ -2407,13 +2828,22 @@ class _TicketDialogState extends State<_TicketDialog> {
 
   Future<void> refresh() => controller.refresh();
   Future<void> issue() async {
-    if (busy || loading || !canIssue) return;
+    if (busy || loading || controller.state.dispatchLoading || !canIssue)
+      return;
     setState(() {
       qrExpiry?.cancel();
       qr?.clear();
       qr = null;
     });
-    final result = await controller.issue();
+    PatientQr? result;
+    try {
+      result = await controller.issue();
+    } catch (e) {
+      if (mounted && widget.repository.active) {
+        QueueBFeedback.error(context, '${patientError(e)}');
+      }
+      return;
+    }
     if (!mounted || !canIssue) {
       result?.clear();
       return;
@@ -2496,13 +2926,11 @@ class _TicketDialogState extends State<_TicketDialog> {
         title,
         style: const TextStyle(fontSize: 10, color: PatientDesign.muted),
       ),
-      const SizedBox(height: 3),
+      const SizedBox(height: 2),
       Text(
         value,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
         style: const TextStyle(
-          fontSize: 12,
+          fontSize: 11,
           height: 1.25,
           fontWeight: FontWeight.w700,
           color: PatientDesign.ink,
@@ -2513,7 +2941,7 @@ class _TicketDialogState extends State<_TicketDialog> {
 
   Widget _qrNotice(IconData icon, String title, {String? detail}) => Container(
     width: double.infinity,
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+    padding: const EdgeInsets.all(8),
     decoration: BoxDecoration(
       color: PatientDesign.soft.withValues(alpha: .65),
       borderRadius: BorderRadius.circular(12),
@@ -2521,8 +2949,8 @@ class _TicketDialogState extends State<_TicketDialog> {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 20, color: PatientDesign.primary),
-        const SizedBox(width: 9),
+        Icon(icon, size: 18, color: PatientDesign.primary),
+        const SizedBox(width: 6),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2596,7 +3024,8 @@ class _TicketDialogState extends State<_TicketDialog> {
         error != null ||
         !widget.repository.active ||
         controller.state.load != PatientLoad.loaded ||
-        controller.ticket == null) {
+        controller.ticket == null ||
+        const {'MENUNGGU', 'DILAYANI'}.contains(controller.ticket?['status'])) {
       return;
     }
     // Only the successfully refreshed, owned ticket is exported. Never rely
@@ -2623,353 +3052,619 @@ class _TicketDialogState extends State<_TicketDialog> {
     }
   }
 
-  // No rescheduling/deletion mutation contract is exposed by the supplied
-  // repository. This menu is a safe UI entry point, not a fake mutation.
-  Future<void> _showManagementUnavailable(String action) async {
-    if (!mounted) return;
-    final reschedule = action == 'reschedule';
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(reschedule ? 'Jadwalkan ulang' : 'Hapus dari Riwayat'),
-        content: Text(
-          reschedule
-              ? 'Penjadwalan ulang memerlukan dukungan backend untuk '
-                    'memindahkan reservasi dan memvalidasi slot pengganti '
-                    'secara aman. Jadwal dan tiket saat ini tidak berubah.'
-              : 'Menyembunyikan tiket dari Riwayat memerlukan dukungan '
-                    'backend per akun. Tiket dan catatan operasional '
-                    'tidak boleh dihapus langsung. Tidak ada data yang diubah.',
+  void _closeTicket() {
+    if (!busy && mounted) Navigator.of(context).pop();
+  }
+
+  void _manageTicket() {
+    final onManage = widget.onManage;
+    if (onManage == null || busy || loading || error != null) return;
+    Navigator.of(context).pop();
+    onManage();
+  }
+
+  String _ticketClock(DateTime? instant) => instant == null
+      ? '—'
+      : '${clockOnly(widget.api.config.localInput(instant.toIso8601String())).replaceAll(':', '.')} '
+            '${patientHomeTimeZone(widget.api.config.serviceTimeZone)}';
+
+  Widget _ticketIdentity({
+    required Json ticket,
+    required String service,
+    required String dateLabel,
+    required String destination,
+    required String checkedInLabel,
+  }) {
+    final status = '${ticket['status'] ?? '—'}';
+    final identity = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'NOMOR REGISTRASI',
+          style: TextStyle(
+            fontSize: 10,
+            height: 1.3,
+            letterSpacing: .5,
+            fontWeight: FontWeight.w600,
+            color: PatientDesign.muted,
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Mengerti'),
+        const SizedBox(height: 2),
+        Text(
+          '${ticket['nomorAntrean'] ?? '—'}',
+          style: const TextStyle(
+            fontSize: 32,
+            height: 1.05,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -.5,
+            fontFeatures: [FontFeature.tabularFigures()],
+            color: PatientDesign.primary,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: PatientDesign.soft,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            'Layanan: $service',
+            style: const TextStyle(
+              fontSize: 10,
+              height: 1.3,
+              fontWeight: FontWeight.w600,
+              color: PatientDesign.muted,
+            ),
+          ),
+        ),
+      ],
+    );
+    final state = Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        ReservationStatus(status),
+        if (checkedInLabel != '—') ...[
+          const SizedBox(height: 4),
+          const Text(
+            'Check-in',
+            style: TextStyle(fontSize: 10, color: PatientDesign.muted),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            checkedInLabel,
+            style: const TextStyle(
+              fontSize: 11,
+              height: 1.3,
+              fontWeight: FontWeight.w700,
+              fontFeatures: [FontFeature.tabularFigures()],
+              color: PatientDesign.ink,
+            ),
           ),
         ],
-      ),
+      ],
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        LayoutBuilder(
+          builder: (context, bounds) {
+            if (bounds.maxWidth < 270 ||
+                MediaQuery.textScalerOf(context).scale(12) > 17) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [identity, const SizedBox(height: 6), state],
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: identity),
+                const SizedBox(width: 6),
+                Flexible(child: state),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: PatientDesign.soft,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: LayoutBuilder(
+            builder: (context, bounds) {
+              final normalText =
+                  MediaQuery.textScalerOf(context).scale(12) <= 17;
+              final columns = normalText && bounds.maxWidth >= 264
+                  ? 3
+                  : normalText && bounds.maxWidth >= 220
+                  ? 2
+                  : 1;
+              final facts = <(String, String)>[
+                ('Pasien', '${widget.api.user?['nama'] ?? '—'}'),
+                ('Tanggal', dateLabel),
+                ('Loket Tujuan', destination),
+              ];
+              return Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final fact in facts)
+                    SizedBox(
+                      width: (bounds.maxWidth - (columns - 1) * 6) / columns,
+                      child: _ticketFact(fact.$1, fact.$2),
+                    ),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _manageTicketMenu(String status) => PopupMenuButton<String>(
-    tooltip: 'Kelola tiket',
-    onSelected: _showManagementUnavailable,
-    itemBuilder: (_) => [
-      if (status == 'DIPESAN')
-        const PopupMenuItem(
-          value: 'reschedule',
-          child: Row(
-            children: [
-              Icon(Icons.calendar_month_outlined, size: 18),
-              SizedBox(width: 10),
-              Expanded(child: Text('Jadwalkan ulang')),
-            ],
-          ),
+  Widget _proofQr(String payload, String title, {String? subtitle}) =>
+      Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          border: Border.all(color: PatientDesign.border),
+          borderRadius: BorderRadius.circular(10),
         ),
-      const PopupMenuItem(
-        value: 'hide',
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.archive_outlined, size: 18),
-            SizedBox(width: 10),
-            Expanded(child: Text('Hapus dari Riwayat')),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: PatientDesign.ink,
+              ),
+            ),
+            const SizedBox(height: 4),
+            LayoutBuilder(
+              builder: (context, box) => QrImageView(
+                data: payload,
+                size: box.maxWidth.clamp(0.0, 208.0),
+                padding: const EdgeInsets.all(12),
+                backgroundColor: Colors.white,
+                semanticsLabel: '$title tiket ${data['nomorAntrean']}',
+              ),
+            ),
+            if (subtitle != null)
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 11,
+                  height: 1.35,
+                  color: PatientDesign.muted,
+                ),
+              ),
           ],
         ),
+      );
+
+  Widget _temporaryCheckInQr(String day, String dayLabel) => ExpansionTile(
+    key: const PageStorageKey('ticket-temporary-check-in-qr'),
+    dense: true,
+    minTileHeight: 44,
+    expansionAnimationStyle: AnimationStyle(
+      duration: QueueBMotion.duration(context, QueueBMotion.component),
+      reverseDuration: QueueBMotion.duration(context, QueueBMotion.component),
+    ),
+    tilePadding: const EdgeInsets.symmetric(horizontal: 4),
+    childrenPadding: const EdgeInsets.fromLTRB(0, 0, 0, 6),
+    initiallyExpanded: widget.issueQrOnOpen,
+    shape: const Border(),
+    collapsedShape: const Border(),
+    leading: const Icon(Icons.qr_code_2_rounded, size: 18),
+    title: const Text(
+      'QR Check-in Sementara',
+      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+    ),
+    subtitle: const Text(
+      'Kode sekali pakai untuk check-in pada hari pelayanan.',
+      style: TextStyle(fontSize: 11, height: 1.3),
+    ),
+    children: [
+      if (qr?.payload != null && remaining > 0 && canIssue)
+        _proofQr(
+          qr!.payload!,
+          'QR Check-in Sementara',
+          subtitle: 'Berlaku $remaining detik · sekali pakai',
+        )
+      else if (day.compareTo(widget.api.config.today) > 0)
+        _qrNotice(
+          Icons.event_available_outlined,
+          'QR check-in tersedia pada $dayLabel',
+          detail: 'QR bukti reservasi di atas tetap terpisah.',
+        )
+      else if (canIssue)
+        _qrNotice(
+          Icons.qr_code_2_rounded,
+          'QR check-in siap diterbitkan',
+          detail: 'Kode sementara berlaku 10 menit dan sekali pakai.',
+        )
+      else
+        _qrNotice(
+          Icons.event_busy_outlined,
+          'QR check-in belum tersedia',
+          detail: 'Periksa tanggal pelayanan dan muat ulang status tiket.',
+        ),
+      if (canIssue) ...[
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: busy || loading || controller.state.dispatchLoading
+                ? null
+                : issue,
+            style: _ticketActionStyle(primary: true),
+            icon: const Icon(Icons.qr_code_rounded, size: 18),
+            label: Text(qr == null ? 'Terbitkan QR' : 'Perbarui QR'),
+          ),
+        ),
+      ],
+    ],
+  );
+
+  ButtonStyle _ticketActionStyle({bool primary = false}) =>
+      FilledButton.styleFrom(
+        minimumSize: const Size(44, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        backgroundColor: primary ? PatientDesign.primary : PatientDesign.soft,
+        foregroundColor: primary ? Colors.white : PatientDesign.ink,
+        textStyle: const TextStyle(
+          fontSize: 12,
+          height: 1.3,
+          fontWeight: FontWeight.w600,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      );
+
+  Widget _ticketExportActions() => LayoutBuilder(
+    builder: (context, bounds) {
+      final disabled =
+          exportingPdf ||
+          busy ||
+          loading ||
+          error != null ||
+          !widget.repository.active ||
+          controller.state.load != PatientLoad.loaded ||
+          controller.ticket == null;
+      final download = FilledButton.icon(
+        onPressed: disabled ? null : () => _exportPdf(print: false),
+        style: _ticketActionStyle(),
+        icon: const Icon(Icons.download_outlined, size: 18),
+        label: const Text('Unduh PDF'),
+      );
+      final print = FilledButton.icon(
+        onPressed: disabled ? null : () => _exportPdf(print: true),
+        style: _ticketActionStyle(),
+        icon: const Icon(Icons.print_outlined, size: 18),
+        label: const Text('Cetak Tiket'),
+      );
+      if (bounds.maxWidth < 270 ||
+          MediaQuery.textScalerOf(context).scale(12) > 17) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [download, const SizedBox(height: 8), print],
+        );
+      }
+      return Row(
+        children: [
+          Expanded(child: download),
+          const SizedBox(width: 8),
+          Expanded(child: print),
+        ],
+      );
+    },
+  );
+
+  Widget _ticketFooter(bool waiting) => Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      FilledButton.icon(
+        onPressed: busy || loading || controller.state.dispatchLoading
+            ? null
+            : refresh,
+        style: _ticketActionStyle(primary: true),
+        icon: const Icon(Icons.sync_rounded, size: 16),
+        label: Text(waiting ? 'Perbarui Status' : 'Perbarui'),
+      ),
+      const SizedBox(height: 4),
+      LayoutBuilder(
+        builder: (context, bounds) {
+          final manage = FilledButton.icon(
+            onPressed:
+                widget.onManage == null ||
+                    busy ||
+                    loading ||
+                    error != null ||
+                    !widget.repository.active ||
+                    controller.ticket == null
+                ? null
+                : _manageTicket,
+            style: _ticketActionStyle(),
+            icon: const Icon(Icons.tune_rounded, size: 16),
+            label: const Text('Kelola'),
+          );
+          final close = FilledButton(
+            onPressed: busy ? null : _closeTicket,
+            style: _ticketActionStyle(),
+            child: const Text('Tutup'),
+          );
+          if (bounds.maxWidth < 220 ||
+              MediaQuery.textScalerOf(context).scale(13) > 20) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [manage, const SizedBox(height: 4), close],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(child: manage),
+              const SizedBox(width: 6),
+              Expanded(child: close),
+            ],
+          );
+        },
       ),
     ],
-    child: const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.more_horiz, size: 18),
-          SizedBox(width: 4),
-          Text('Kelola', style: TextStyle(fontSize: 12)),
-        ],
-      ),
-    ),
   );
 
   Widget content(BuildContext context) {
     final currentTicket = data;
+    final state = controller.state;
     final status = '${currentTicket['status'] ?? '—'}';
+    final waiting = status == 'MENUNGGU';
+    final booked = status == 'DIPESAN';
     final day = dateOnly(
       currentTicket['tanggalPelayanan'] ?? currentTicket['tanggalAntrean'],
     );
-    final today = widget.api.config.today;
-    final dayLabel = day.isEmpty ? 'Belum ditentukan' : patientDate(day);
+    final parsedDay = DateTime.tryParse(day);
+    final dateLabel = parsedDay == null
+        ? 'Belum ditentukan'
+        : '${patientCompactDate(day)} ${parsedDay.year}';
+    final dispatch = state.dispatch;
+    final sameTicket = dispatch?.matches(currentTicket) == true;
+    final verifiedDispatch = sameTicket ? dispatch : null;
+    final currentDispatch =
+        verifiedDispatch != null &&
+        verifiedDispatch.freshAt(widget.api.config.now) &&
+        error == null &&
+        state.load == PatientLoad.loaded &&
+        widget.repository.active &&
+        !state.dispatchLoading &&
+        state.dispatchError == null;
     final slot = object(widget.appointment?['slotPraktik']);
     final session = object(slot['jadwalPraktik']);
     final doctor = object(object(session['dokterLayanan'])['dokter']);
-    final roomFromSession = object(session['loket']);
-    final room = roomFromSession.isNotEmpty
-        ? roomFromSession
-        : object(currentTicket['ruang']);
+    final assigned = currentDispatch
+        ? object(verifiedDispatch?.destination)
+        : <String, dynamic>{};
+    final scheduled = object(session['loket']);
+    // A waiting ticket's check-in room is not its promised CALL destination.
+    final room = assigned.isNotEmpty
+        ? assigned
+        : booked
+        ? scheduled
+        : <String, dynamic>{};
     final roomCode = '${room['kode'] ?? ''}'.trim();
-    final roomName = label(room).trim();
-    final roomText = roomCode.isEmpty || roomCode == roomName
-        ? roomName
-        : '$roomCode · $roomName';
-    final patientName = '${widget.api.user?['nama'] ?? ''}'.trim();
+    final roomText = roomCode.isNotEmpty
+        ? roomCode
+        : room.isEmpty
+        ? 'Belum ditetapkan'
+        : label(room);
+    final checkedIn = verifiedDispatch?.checkedInAt;
+    final receipt =
+        booked &&
+            error == null &&
+            state.load == PatientLoad.loaded &&
+            controller.ticket != null
+        ? _pdfData(controller.ticket!).receiptQrPayload
+        : null;
     final service = label(object(currentTicket['layanan']));
-    final info = <(String, String)>[
-      ('Tanggal pelayanan', dayLabel),
-      if (slot['mulaiPada'] != null)
-        (
-          'Jam konsultasi',
-          '${patientTime(slot, widget.api.config)} · ${widget.api.config.serviceTimeZone}',
+    final statusDescription = switch (status) {
+      'CHECK_IN' =>
+        'Check-in tercatat. Menunggu pembaruan antrean dari petugas.',
+      'DIPANGGIL' => 'Nomor Anda sedang dipanggil. Perhatikan loket tujuan dan panggilan petugas.',
+      'DILAYANI' => 'Pelayanan sedang berlangsung.',
+      'SELESAI' => 'Pelayanan selesai.',
+      'DIBATALKAN' => 'Reservasi telah dibatalkan.',
+      'DILEWATI' => 'Panggilan dilewati. Hubungi petugas untuk tindak lanjut.',
+      _ => 'Status tiket: ${reservationStatus(status)}.',
+    };
+    final body = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _ticketIdentity(
+          ticket: currentTicket,
+          service: service,
+          dateLabel: dateLabel,
+          destination: roomText,
+          checkedInLabel: _ticketClock(checkedIn),
         ),
-      if (room.isNotEmpty && roomText.isNotEmpty) ('Ruang / Loket', roomText),
-      if (doctor['nama'] != null) ('Dokter', label(doctor)),
-      if (patientName.isNotEmpty) ('Pasien', patientName),
-    ];
-
-    return PopScope(
-      canPop: !busy,
-      child: AlertDialog(
-        backgroundColor: PatientDesign.paper,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        titlePadding: const EdgeInsets.fromLTRB(16, 13, 16, 6),
-        contentPadding: const EdgeInsets.fromLTRB(16, 0, 16, 2),
-        actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            const Icon(
-              Icons.confirmation_number_outlined,
-              color: PatientDesign.primary,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            const Expanded(
-              child: Text(
-                'Detail Tiket',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: PatientDesign.ink,
+        if (slot['mulaiPada'] != null || doctor['nama'] != null) ...[
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              if (slot['mulaiPada'] != null)
+                Text(
+                  '${patientTime(slot, widget.api.config)} '
+                  '${patientHomeTimeZone(widget.api.config.serviceTimeZone)}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: PatientDesign.muted,
+                  ),
                 ),
+              if (doctor['nama'] != null)
+                Text(
+                  label(doctor),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: PatientDesign.muted,
+                  ),
+                ),
+            ],
+          ),
+        ],
+        const SizedBox(height: 4),
+        const PatientTicketSeparator(),
+        const SizedBox(height: 4),
+        if (loading || busy) ...[
+          const LinearProgressIndicator(semanticsLabel: 'Memuat tiket'),
+          const SizedBox(height: 8),
+        ],
+        if (error != null) ...[
+          MobileNotice(error!, error: true),
+          const SizedBox(height: 8),
+        ],
+        if (waiting) ...[
+          PatientTicketDispatchPanel(
+            position: currentDispatch ? verifiedDispatch?.position : null,
+            ahead: currentDispatch ? verifiedDispatch?.ahead : null,
+            serving: currentDispatch
+                ? verifiedDispatch?.serving ?? const []
+                : const [],
+            checkInLabel: _ticketClock(checkedIn),
+            checkInVerified: checkedIn != null,
+            loading: state.dispatchLoading,
+            failed: state.dispatchError != null || error != null,
+            live: currentDispatch && state.dispatchConnected,
+            updatedLabel: verifiedDispatch == null
+                ? null
+                : _ticketClock(verifiedDispatch.observedAt),
+          ),
+          if (state.dispatchError != null) ...[
+            const SizedBox(height: 6),
+            const Text(
+              'Status antrean belum dapat diperbarui. Coba Perbarui Status.',
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.4,
+                color: PatientDesign.muted,
               ),
             ),
           ],
-        ),
-        content: SizedBox(
-          width: 420,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${currentTicket['nomorAntrean'] ?? '—'}',
-                            style: const TextStyle(
-                              fontSize: 27,
-                              fontWeight: FontWeight.w800,
-                              height: 1.1,
-                              color: PatientDesign.ink,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            service,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: PatientDesign.muted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    ReservationStatus(status),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                const Divider(height: 1, color: PatientDesign.border),
-                const SizedBox(height: 10),
-                LayoutBuilder(
-                  builder: (context, box) {
-                    final singleColumn =
-                        box.maxWidth < 250 ||
-                        MediaQuery.textScalerOf(context).scale(12) > 17;
-                    final width = singleColumn
-                        ? box.maxWidth
-                        : (box.maxWidth - 10) / 2;
-                    return Wrap(
-                      spacing: 10,
-                      runSpacing: 9,
-                      children: [
-                        for (final fact in info)
-                          SizedBox(
-                            width: width,
-                            child: _ticketFact(fact.$1, fact.$2),
-                          ),
-                      ],
-                    );
-                  },
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed:
-                            exportingPdf ||
-                                busy ||
-                                loading ||
-                                error != null ||
-                                controller.state.load != PatientLoad.loaded ||
-                                controller.ticket == null
-                            ? null
-                            : () => _exportPdf(print: false),
-                        icon: const Icon(Icons.download_outlined, size: 17),
-                        label: const Text(
-                          'Unduh PDF',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed:
-                            exportingPdf ||
-                                busy ||
-                                loading ||
-                                error != null ||
-                                controller.state.load != PatientLoad.loaded ||
-                                controller.ticket == null
-                            ? null
-                            : () => _exportPdf(print: true),
-                        icon: const Icon(Icons.print_outlined, size: 17),
-                        label: const Text(
-                          'Cetak Tiket',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                if (exportingPdf) ...[
-                  const SizedBox(height: 4),
-                  const LinearProgressIndicator(
-                    semanticsLabel: 'Menyiapkan PDF bukti reservasi',
-                  ),
-                ],
-                const SizedBox(height: 10),
-                if (error != null) ...[
-                  MobileNotice(error!, error: true),
-                  const SizedBox(height: 6),
-                ],
-                if (loading || busy) ...[
-                  LinearProgressIndicator(
-                    semanticsLabel: widget.issueQrOnOpen || busy
-                        ? 'Memuat QR check-in'
-                        : 'Memuat tiket',
-                  ),
-                  const SizedBox(height: 6),
-                ],
-                if (qr != null && remaining > 0) ...[
-                  Container(
-                    alignment: Alignment.center,
-                    padding: const EdgeInsets.symmetric(vertical: 7),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: PatientDesign.border),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          'Kode QR Check-in',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: PatientDesign.ink,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        LayoutBuilder(
-                          builder: (context, box) => QrImageView(
-                            data: qr!.payload ?? '',
-                            size: box.maxWidth.clamp(0.0, 208.0),
-                            backgroundColor: Colors.white,
-                            semanticsLabel:
-                                'QR check-in tiket ${currentTicket['nomorAntrean']}',
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          'Berlaku $remaining detik · sekali pakai',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: PatientDesign.success,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ] else if (status == 'DIPESAN' && day.compareTo(today) > 0) ...[
-                  _qrNotice(
-                    Icons.event_available_outlined,
-                    'Kode QR diterbitkan pada $dayLabel',
-                    detail: 'Buka kembali tiket pada tanggal pelayanan.',
-                  ),
-                ] else if (canIssue) ...[
-                  _qrNotice(
-                    Icons.qr_code_2_rounded,
-                    'Kode QR siap diterbitkan',
-                    detail: 'Berlaku 10 menit dan hanya sekali pakai.',
-                  ),
-                ] else if (status == 'DIPESAN' && day.compareTo(today) < 0) ...[
-                  _qrNotice(
-                    Icons.event_busy_outlined,
-                    'Tanggal pelayanan telah berlalu',
-                    detail: 'Muat ulang status atau hubungi petugas.',
-                  ),
-                ] else ...[
-                  _qrNotice(
-                    Icons.qr_code_2_rounded,
-                    'Kode QR tidak tersedia',
-                    detail: 'Status tiket: ${reservationStatus(status)}.',
-                  ),
-                ],
-                if (canIssue) ...[
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: busy || loading ? null : issue,
-                      icon: const Icon(Icons.qr_code_rounded, size: 18),
-                      label: Text(qr == null ? 'Terbitkan QR' : 'Perbarui QR'),
-                    ),
-                  ),
-                ],
-                // Technical ID, raw QR payload and repetitive helper text are
-                // intentionally omitted from the patient-facing UI.
-              ],
+        ] else if (booked) ...[
+          if (receipt != null)
+            _proofQr(
+              receipt,
+              'QR Bukti Reservasi',
+              subtitle: 'Simpan atau tunjukkan bukti reservasi sesuai alur pelayanan.',
+            )
+          else
+            _qrNotice(
+              Icons.receipt_long_outlined,
+              'Bukti QR reservasi belum tersedia',
+              detail: 'Perbarui tiket untuk memuat bukti reservasi yang sah.',
             ),
+          const SizedBox(height: 8),
+          _ticketExportActions(),
+          const SizedBox(height: 4),
+          _temporaryCheckInQr(day, dateLabel),
+        ] else ...[
+          _qrNotice(
+            PatientDesign.statusIcon(status),
+            reservationStatus(status),
+            detail: statusDescription,
+          ),
+          if (status != 'DILAYANI') ...[
+            if (checkedIn != null) ...[
+              const SizedBox(height: 8),
+              _ticketFact('Check-in terverifikasi', _ticketClock(checkedIn)),
+            ],
+            const SizedBox(height: 8),
+            _ticketExportActions(),
+          ],
+        ],
+        if (exportingPdf && status != 'MENUNGGU' && status != 'DILAYANI') ...[
+          const SizedBox(height: 6),
+          const LinearProgressIndicator(semanticsLabel: 'Menyiapkan PDF tiket'),
+        ],
+      ],
+    );
+    return PopScope(
+      canPop: !busy,
+      child: Dialog(
+        backgroundColor: PatientDesign.paper,
+        insetPadding: const EdgeInsets.all(12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        clipBehavior: Clip.antiAlias,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 2, 4, 0),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: BoxDecoration(
+                        color: PatientDesign.soft,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.confirmation_number_outlined,
+                        size: 16,
+                        color: PatientDesign.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Expanded(
+                      child: Text(
+                        'Detail Tiket',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Tutup detail tiket',
+                      onPressed: busy ? null : _closeTicket,
+                      style: IconButton.styleFrom(
+                        backgroundColor: PatientDesign.soft,
+                        foregroundColor: PatientDesign.muted,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 44,
+                        minHeight: 44,
+                      ),
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                    ),
+                  ],
+                ),
+              ),
+              Flexible(
+                fit: FlexFit.loose,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(12, 2, 12, 6),
+                  child: body,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+                child: _ticketFooter(waiting),
+              ),
+            ],
           ),
         ),
-        actions: [
-          TextButton.icon(
-            onPressed: busy || loading ? null : refresh,
-            icon: const Icon(Icons.refresh, size: 17),
-            label: const Text('Perbarui'),
-          ),
-          _manageTicketMenu(status),
-          TextButton(
-            onPressed: busy ? null : () => Navigator.pop(context),
-            child: const Text('Tutup'),
-          ),
-        ],
       ),
     );
   }

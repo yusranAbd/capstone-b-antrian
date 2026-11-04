@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 
+import 'app_brand.dart';
 import 'config.dart';
 import 'service_category.dart';
 import 'patient_design.dart';
@@ -91,15 +92,16 @@ class PatientHomeHeaderV6 extends StatelessWidget {
               TextSpan(
                 children: [
                   TextSpan(
-                    text: 'QueueB ',
+                    text: '${AppBrand.leading} ',
                     style: TextStyle(color: PatientDesign.ink),
                   ),
                   TextSpan(
-                    text: 'Hospital',
+                    text: AppBrand.accent,
                     style: TextStyle(color: PatientHomeV6Style.walkIn),
                   ),
                 ],
               ),
+              semanticsLabel: AppBrand.name,
               style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
             ),
           ),
@@ -392,13 +394,14 @@ class PatientHomeService extends StatelessWidget {
     this.ticket,
     this.queue,
     this.hours = 'Jam belum tersedia',
+    this.timeZoneLabel = '',
     this.staffName,
     this.onTap,
   });
   final Json clinic;
   final Json? ticket;
   final PatientQueueView? queue;
-  final String hours;
+  final String hours, timeZoneLabel;
   final String? staffName;
   final VoidCallback? onTap;
   @override
@@ -407,6 +410,7 @@ class PatientHomeService extends StatelessWidget {
     ticket: ticket,
     queue: queue,
     hours: hours,
+    timeZoneLabel: timeZoneLabel,
     staffName: staffName,
     onTap: onTap,
   );

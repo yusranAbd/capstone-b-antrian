@@ -4,6 +4,8 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import 'app_brand.dart';
+
 /// Data cetak yang aman: tanpa ID teknis dan token QR check-in sementara.
 class PatientTicketPdfData {
   const PatientTicketPdfData({
@@ -46,7 +48,7 @@ class PatientTicketPdfData {
       return cleaned.isEmpty ? 'tiket' : cleaned;
     }
 
-    return 'QueueB_Nota_Reservasi_${safe(queueNumber)}_${safe(serviceDate)}.pdf';
+    return '${AppBrand.filePrefix}_Nota_Reservasi_${safe(queueNumber)}_${safe(serviceDate)}.pdf';
   }
 }
 
@@ -89,8 +91,8 @@ class PatientTicketPdf {
     PdfPageFormat? pageFormat,
   }) async {
     final pdf = pw.Document(
-      title: 'Nota Bukti Reservasi QueueB Hospital',
-      author: 'QueueB Hospital',
+      title: 'Nota Bukti Reservasi ${AppBrand.name}',
+      author: AppBrand.name,
       subject: 'Bukti reservasi. Tidak berlaku untuk QR check-in.',
     );
     const ink = PdfColor.fromInt(0xff1c2541);
@@ -142,7 +144,7 @@ class PatientTicketPdf {
           crossAxisAlignment: pw.CrossAxisAlignment.stretch,
           children: [
             pw.Text(
-              'QueueB Hospital',
+              AppBrand.name,
               textAlign: pw.TextAlign.center,
               style: pw.TextStyle(
                 fontSize: 13,

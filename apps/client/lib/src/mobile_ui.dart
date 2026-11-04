@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'app_brand.dart';
 import 'patient_design.dart';
 import 'queueb_feedback.dart';
 import 'queueb_palette.dart';
@@ -125,56 +126,111 @@ class QueueBBrand extends StatelessWidget {
   final double? fontSize;
   final double? logoSize;
   @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Container(
-        width: logoSize ?? (compact ? 32 : 48),
-        height: logoSize ?? (compact ? 32 : 48),
-        decoration: BoxDecoration(
-          color: onDark ? Colors.white : QueueBStyle.teal,
-          borderRadius: BorderRadius.circular(
-            onDark ? 12 : (compact ? 10 : 16),
-          ),
-        ),
-        child: Icon(
-          Icons.local_hospital_rounded,
-          color: onDark ? QueueBStyle.teal : Colors.white,
-          size: logoSize == null ? (compact ? 23 : 36) : logoSize! * .76,
-        ),
-      ),
-      const SizedBox(width: 10),
-      Flexible(
-        child: Text.rich(
-          TextSpan(
-            children: [
-              TextSpan(
-                text: 'QueueB',
-                style: TextStyle(
-                  color: onDark ? Colors.white : QueueBStyle.navy,
-                ),
-              ),
-              TextSpan(
-                text: compact ? ' Hospital' : '\nHospital',
-                style: TextStyle(
-                  color: onDark
-                      ? const Color(0xffa7ceff)
-                      : QueueBStyle.darkTeal,
-                ),
-              ),
-            ],
-          ),
-          maxLines: onDark ? 1 : null,
-          overflow: onDark ? TextOverflow.ellipsis : null,
-          style: TextStyle(
+  Widget build(BuildContext context) => Semantics(
+    label: AppBrand.name,
+    image: true,
+    child: LayoutBuilder(
+      builder: (context, bounds) {
+        final size = logoSize ?? (compact ? 32.0 : 48.0);
+        final style = DefaultTextStyle.of(context).style.merge(
+          TextStyle(
             fontSize: fontSize ?? (compact ? 18 : 30),
             height: 1.05,
             fontWeight: FontWeight.w800,
             letterSpacing: onDark ? -.5 : null,
           ),
-        ),
-      ),
-    ],
+        );
+        TextSpan wordmark(bool singleLine) => TextSpan(
+          style: style,
+          children: [
+            TextSpan(
+              text: '${AppBrand.leading}${singleLine ? ' ' : '\n'}',
+              style: TextStyle(color: onDark ? Colors.white : QueueBStyle.navy),
+            ),
+            TextSpan(
+              text: AppBrand.accent,
+              style: TextStyle(
+                color: onDark ? const Color(0xffa7ceff) : QueueBStyle.darkTeal,
+              ),
+            ),
+          ],
+        );
+        final textWidth = bounds.hasBoundedWidth
+            ? (bounds.maxWidth - size - 10)
+                  .clamp(1.0, double.infinity)
+                  .toDouble()
+            : double.infinity;
+        final painter = TextPainter(
+          text: wordmark(false),
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout(maxWidth: textWidth);
+        // Compact toolbars keep their existing height. Prefer the complete
+        // two-line name, then one scaled line when the toolbar is too short.
+        final singleLine =
+            compact &&
+            bounds.hasBoundedHeight &&
+            painter.height > bounds.maxHeight + .5;
+        var markOnly = false;
+        if (singleLine) {
+          painter
+            ..text = wordmark(true)
+            ..maxLines = 1
+            ..ellipsis = '…'
+            ..layout(maxWidth: textWidth);
+          markOnly = painter.height > bounds.maxHeight + .5;
+        }
+        painter.dispose();
+        final brand = ExcludeSemantics(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: size,
+                height: size,
+                decoration: BoxDecoration(
+                  color: onDark ? Colors.white : QueueBStyle.teal,
+                  borderRadius: BorderRadius.circular(
+                    onDark ? 12 : (compact ? 10 : 16),
+                  ),
+                ),
+                child: Icon(
+                  Icons.local_hospital_rounded,
+                  color: onDark ? QueueBStyle.teal : Colors.white,
+                  size: logoSize == null
+                      ? (compact ? 23 : 36)
+                      : logoSize! * .76,
+                ),
+              ),
+              if (!markOnly) ...[
+                const SizedBox(width: 10),
+                Flexible(
+                  // Clear an ancestor's one-line DefaultTextStyle so the full
+                  // name can wrap without limiting accessibility text scaling.
+                  child: DefaultTextStyle(
+                    style: style,
+                    child: Text.rich(
+                      wordmark(singleLine),
+                      maxLines: singleLine ? 1 : null,
+                      overflow: singleLine
+                          ? TextOverflow.ellipsis
+                          : TextOverflow.clip,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+        return singleLine || markOnly
+            ? Tooltip(
+                message: AppBrand.name,
+                excludeFromSemantics: true,
+                child: brand,
+              )
+            : brand;
+      },
+    ),
   );
 }
 

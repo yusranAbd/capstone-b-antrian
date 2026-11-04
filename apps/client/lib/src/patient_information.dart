@@ -62,7 +62,7 @@ class PatientInformation extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                'Layanan dan jam operasional dari katalog rumah sakit. Jadwal mengikuti zona pelayanan $timeZone.',
+                'Layanan dan jam operasional dari katalog klinik. Jadwal mengikuti zona pelayanan $timeZone.',
                 style: const TextStyle(
                   fontSize: 13,
                   height: 1.4,

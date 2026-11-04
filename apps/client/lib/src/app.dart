@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 
+import 'app_brand.dart';
 import 'routing/app_router.dart';
 
 import 'admin_ui.dart';
+import 'admin_dashboard_header.dart';
 import 'api.dart';
 import 'user_profile.dart';
 import 'doctor_visual.dart';
@@ -51,7 +53,7 @@ class _QueueBAppState extends State<QueueBApp> {
           routing.router.routeInformationProvider.value.uri.toString(),
       child: child ?? const SizedBox.shrink(),
     ),
-    title: 'QueueB Hospital',
+    title: AppBrand.name,
     debugShowCheckedModeBanner: false,
     locale: const Locale('id'),
     supportedLocales: const [Locale('id'), Locale('en')],
@@ -80,6 +82,20 @@ PreferredSizeWidget portalHeader(
   Widget? staffContext,
 }) {
   final role = api.user?['peran'];
+  if (role == 'ADMIN') {
+    return AdminPortalHeader(
+      api: api,
+      height: AdminPortalHeader.heightFor(context),
+      onProfile: openProfile,
+      onLogout: () async {
+        try {
+          await api.logout();
+        } catch (_) {
+          /* Session gate reports cleanup failures and server confirmation. */
+        }
+      },
+    );
+  }
   if (role == 'PETUGAS') {
     return StaffToolbar(
       selection: staffContext ?? const SizedBox(),
@@ -360,9 +376,7 @@ class _LoginPageState extends State<LoginPage> {
               ),
               const SizedBox(height: 6),
               Text(
-                register
-                    ? 'Daftar akun pasien'
-                    : 'Akses sistem antrean rumah sakit',
+                register ? 'Daftar akun pasien' : 'Akses sistem antrean klinik',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: PatientDesign.muted,

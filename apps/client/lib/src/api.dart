@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import 'app_brand.dart';
 import 'config.dart';
 import 'display_client.dart';
 import 'session_store.dart';
@@ -278,7 +279,7 @@ class QueueApi extends ChangeNotifier {
           body: {
             'email': email.trim(),
             'kataSandi': password,
-            'namaPerangkat': 'QueueB Flutter',
+            'namaPerangkat': '${AppBrand.name} · Flutter',
           },
         ),
       );

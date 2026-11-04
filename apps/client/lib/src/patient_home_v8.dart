@@ -1,7 +1,9 @@
 import 'dart:math' as math;
+import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
 
+import 'app_brand.dart';
 import 'api.dart';
 import 'config.dart';
 import 'features/patient/models/patient_queue_models.dart';
@@ -15,8 +17,8 @@ import 'queueb_value_motion.dart';
 import 'user_profile.dart';
 
 abstract final class PatientHomeV8Style {
-  static const blue = PatientBottomNavigation.activeColor;
-  static const background = Color(0xffedf5fc);
+  static const blue = PatientDesign.primary;
+  static const background = Color(0xfff8f9ff);
   static Color accent(PatientServiceCategory category) => switch (category) {
     PatientServiceCategory.registration => blue,
     PatientServiceCategory.pharmacy => const Color(0xff087c70),
@@ -122,19 +124,13 @@ String? patientServiceScheduledProviderName({
     });
     if (!scheduled) continue;
 
-    final fullName = label(doctor).trim().replaceFirst(
-      RegExp(r'^(?:(?:drg?|apt|prof|dokter)\.?\s+)+', caseSensitive: false),
-      '',
-    );
+    final fullName = '${doctor['nama'] ?? ''}'.trim();
     if (fullName.isEmpty) continue;
-    final firstName = fullName.split(RegExp(r'\s+')).first.replaceAll(',', '');
-    if (firstName.isNotEmpty) names.add(firstName);
+    names.add(fullName);
   }
   if (names.isEmpty) return null;
   final ordered = names.toList()..sort();
-  return ordered.length == 1
-      ? ordered.first
-      : '${ordered.first} +${ordered.length - 1}';
+  return ordered.join('\n');
 }
 
 /// Fallback for a service with no matching practice session on the selected
@@ -155,21 +151,15 @@ String? patientServiceLinkedProviderName({
     )) {
       continue;
     }
-    final fullName = label(doctor).trim().replaceFirst(
-      RegExp(r'^(?:(?:drg?|apt|prof|dokter)\.?\s+)+', caseSensitive: false),
-      '',
-    );
-    final first = fullName.split(RegExp(r'\s+')).first.replaceAll(',', '');
-    if (first.isNotEmpty) names.add(first);
+    final fullName = '${doctor['nama'] ?? ''}'.trim();
+    if (fullName.isNotEmpty) names.add(fullName);
   }
   if (names.isEmpty) return null;
   final sorted = names.toList()..sort();
-  return sorted.length == 1
-      ? sorted.first
-      : '${sorted.first} +${sorted.length - 1}';
+  return sorted.join('\n');
 }
 
-/// Compact doctor name for the ticket card, preferring today's practice session
+/// Full doctor names for the ticket card, preferring today's practice session
 /// before the active doctor-service link. Neither implies an active PETUGAS.
 String patientServiceProviderLabel({
   required List<Json> doctors,
@@ -196,12 +186,12 @@ String patientServiceProviderLabel({
 class PatientTicketClipper extends CustomClipper<Path> {
   const PatientTicketClipper(this.stubWidth);
   final double stubWidth;
-  static const notch = 7.0;
+  static const notch = 6.0;
   @override
   Path getClip(Size size) {
     final paper = Path()
       ..addRRect(
-        RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(16)),
+        RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(12)),
       );
     final cutouts = Path();
     for (final center in [
@@ -259,13 +249,14 @@ class PatientServiceTicketV8 extends StatefulWidget {
     this.ticket,
     this.queue,
     this.hours = 'Jam belum tersedia',
+    this.timeZoneLabel = '',
     this.staffName,
     this.onTap,
   });
   final Json clinic;
   final Json? ticket;
   final PatientQueueView? queue;
-  final String hours;
+  final String hours, timeZoneLabel;
   final String? staffName;
   final VoidCallback? onTap;
   @override
@@ -274,11 +265,10 @@ class PatientServiceTicketV8 extends StatefulWidget {
 
 class _PatientServiceTicketV8State extends State<PatientServiceTicketV8> {
   bool _focused = false;
+
   @override
   Widget build(BuildContext context) {
     final clinic = widget.clinic;
-    final category = homeServiceCategory(clinic),
-        accent = PatientHomeV8Style.accent(homeServiceCategory(clinic));
     final candidate = widget.queue ?? const PatientQueueView();
     final queue =
         candidate.summary == null ||
@@ -287,11 +277,14 @@ class _PatientServiceTicketV8State extends State<PatientServiceTicketV8> {
         : const PatientQueueView();
     final summary = queue.summary;
     final scope = (clinic['id'], summary?.date);
+    final number = '${widget.ticket?['nomorAntrean'] ?? ''}'.trim();
+    final hasTicket = number.isNotEmpty;
+    final hasPersonalNumber = hasTicket && number != '—' && number != '-';
     final servingValue = summary?.serving
         .map(
-          (s) => summary.serving.length > 1
-              ? '${s.roomCode}: ${s.number}'
-              : s.number,
+          (entry) => summary.serving.length > 1
+              ? '${entry.roomCode}: ${entry.number}'
+              : entry.number,
         )
         .join('\n');
     final serving = summary == null
@@ -299,257 +292,403 @@ class _PatientServiceTicketV8State extends State<PatientServiceTicketV8> {
         : summary.serving.isEmpty
         ? 'Belum ada pelayanan aktif'
         : servingValue!;
-    final number = '${widget.ticket?['nomorAntrean'] ?? ''}'.trim();
     final staff = widget.staffName?.trim();
-    final metadata = staff == null || staff.isEmpty
-        ? widget.hours
-        : '${widget.hours} · $staff';
-    final queueSemantics = summary == null
-        ? 'Informasi antrean yang sedang dilayani belum tersedia. Total check-in hari ini dan jumlah menunggu belum tersedia.'
-        : 'Sedang dilayani: $serving. Total check-in hari ini ${summary.checkedInTotal ?? 'belum tersedia'}. ${summary.waitingCount == null ? 'Jumlah menunggu belum tersedia' : '${summary.waitingCount} menunggu'}. ${queue.freshness}.';
+    final action = hasTicket ? 'Lihat Status' : 'Ambil Nomor';
+    final hours =
+        RegExp(r'^\d{2}').hasMatch(widget.hours) &&
+            widget.timeZoneLabel.isNotEmpty
+        ? '${widget.hours} ${widget.timeZoneLabel}'
+        : widget.hours;
+
     return Semantics(
       button: true,
       enabled: widget.onTap != null,
       onTap: widget.onTap,
       label:
-          '${label(clinic)}. $metadata. ${number.isEmpty ? 'Belum ada tiket untuk hari ini' : 'Nomor Antreanmu $number'}. $queueSemantics Pilih layanan.',
+          '${label(clinic)}. $hours. '
+          '${staff == null || staff.isEmpty ? '' : '$staff. '}'
+          '${hasPersonalNumber
+              ? 'Nomor antreanmu $number'
+              : hasTicket
+              ? 'Nomor antreanmu belum tersedia'
+              : 'Belum ada tiket untuk hari ini'}. '
+          'Sedang dilayani: $serving. '
+          '${summary?.waitingCount ?? 'Belum tersedia'} menunggu. '
+          '${queue.live ? 'Pembaruan langsung aktif' : 'Pembaruan langsung belum terkonfirmasi'}. '
+          '$action.',
       excludeSemantics: true,
       child: QueueBPressMotion(
         enabled: widget.onTap != null,
         builder: (highlight) => LayoutBuilder(
           builder: (context, bounds) {
-            final stubWidth = (bounds.maxWidth * .23).clamp(76.0, 108.0);
-            final largeText = MediaQuery.textScalerOf(context).scale(12) >= 18;
-            Widget field(String title, Widget value) => Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.25,
-                    color: title == 'Nomor Antreanmu'
-                        ? accent
-                        : PatientDesign.muted,
-                  ),
-                ),
-                const SizedBox(height: 3),
+            final largeText = MediaQuery.textScalerOf(context).scale(14) > 19;
+            final stacked = bounds.maxWidth < 326 || largeText;
+            final stubWidth = (bounds.maxWidth * .31).clamp(112.0, 132.0);
+            final detailsWidth =
+                bounds.maxWidth - (stacked ? 0 : stubWidth) - 24;
+
+            Widget badge(
+              String value,
+              Color ink,
+              Color surface, {
+              bool active = false,
+              bool fill = false,
+              Key? key,
+            }) => Container(
+              width: fill ? double.infinity : null,
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+              decoration: BoxDecoration(
+                color: surface,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
                 value,
-              ],
-            );
-            final personal = field(
-              'Nomor Antreanmu',
-              Text(
-                number.isEmpty ? '—' : number,
-                key: ValueKey('patient-personal-ticket-${clinic['id']}'),
+                key: key,
+                textAlign: fill ? TextAlign.center : TextAlign.start,
                 style: TextStyle(
-                  fontSize: 28,
+                  fontSize: active
+                      ? (summary!.serving.length > 1 ? 18 : 22)
+                      : (bounds.maxWidth >= 480 ? 26 : 22),
                   height: 1.1,
-                  letterSpacing: -.6,
                   fontWeight: FontWeight.w800,
-                  color: accent,
+                  letterSpacing: -.5,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                  color: ink,
                 ),
               ),
             );
+            Widget field(String title, Widget value, {bool stretch = false}) =>
+                Column(
+                  crossAxisAlignment: stretch
+                      ? CrossAxisAlignment.stretch
+                      : CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        height: 1.3,
+                        fontWeight: FontWeight.w600,
+                        color: PatientDesign.muted,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    value,
+                  ],
+                );
+            final personal = field(
+              'ANTREANMU',
+              badge(
+                hasTicket ? number : '—',
+                hasTicket ? Colors.white : PatientDesign.muted,
+                hasTicket ? PatientHomeV8Style.blue : const Color(0xffe5ebf8),
+                key: ValueKey('patient-personal-ticket-${clinic['id']}'),
+              ),
+            );
             final current = field(
-              'Sedang dilayani',
+              'SEDANG DILAYANI',
               QueueBValueMotion(
                 scope: scope,
                 available: summary != null,
                 value: servingValue,
-                child: Text(
-                  serving,
-                  key: ValueKey('patient-serving-${clinic['id']}'),
-                  style: TextStyle(
-                    fontSize: summary?.serving.isNotEmpty == true ? 22 : 12,
-                    height: 1.2,
-                    fontWeight: FontWeight.w700,
-                    color: PatientDesign.muted,
+                child: summary?.serving.isNotEmpty == true
+                    ? badge(
+                        serving,
+                        PatientDesign.statusInk('DILAYANI'),
+                        PatientDesign.statusSurface('DILAYANI'),
+                        active: true,
+                        fill: !hasPersonalNumber,
+                        key: ValueKey('patient-serving-${clinic['id']}'),
+                      )
+                    : Text(
+                        serving,
+                        key: ValueKey('patient-serving-${clinic['id']}'),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          height: 1.4,
+                          color: PatientDesign.muted,
+                        ),
+                      ),
+              ),
+              stretch: !hasPersonalNumber,
+            );
+            final details = Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: PatientDesign.soft,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.confirmation_number_outlined,
+                              size: 13,
+                              color: PatientDesign.primary,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              'Walk-in',
+                              style: TextStyle(
+                                fontSize: 11,
+                                height: 1.3,
+                                fontWeight: FontWeight.w600,
+                                color: PatientDesign.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        hours,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          height: 1.4,
+                          fontWeight: FontWeight.w500,
+                          color: PatientDesign.muted,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  Text(
+                    label(clinic),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      height: 1.25,
+                      fontWeight: FontWeight.w700,
+                      color: PatientDesign.ink,
+                    ),
+                  ),
+                  if (staff != null && staff.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      staff,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        height: 1.35,
+                        color: PatientDesign.muted,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xfff5f7ff),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: !hasPersonalNumber
+                        ? current
+                        : detailsWidth < 176 || largeText
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              personal,
+                              const SizedBox(height: 8),
+                              current,
+                            ],
+                          )
+                        : Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: personal),
+                              const SizedBox(width: 8),
+                              Expanded(child: current),
+                            ],
+                          ),
+                  ),
+                  if (summary == null && (queue.loading || queue.error)) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      queue.freshness,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: PatientDesign.muted,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             );
+            final stub = Container(
+              width: stacked ? null : stubWidth,
+              padding: const EdgeInsets.all(12),
+              color: const Color(0xffeff3ff),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Tooltip(
+                    message: 'Jumlah pasien menunggu pada layanan ini',
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'SISA ANTREAN',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 11,
+                            height: 1.35,
+                            fontWeight: FontWeight.w600,
+                            color: PatientDesign.muted,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        QueueBValueMotion(
+                          scope: scope,
+                          value: summary?.waitingCount,
+                          available: summary?.waitingCount != null,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.groups_2_outlined,
+                                size: 18,
+                                color: PatientDesign.primary,
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  '${summary?.waitingCount ?? '—'}',
+                                  key: ValueKey(
+                                    'patient-queue-waiting-${clinic['id']}',
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 24,
+                                    height: 1.15,
+                                    fontWeight: FontWeight.w800,
+                                    color: PatientDesign.ink,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Text(
+                          'menunggu',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: PatientDesign.muted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    constraints: const BoxConstraints(minHeight: 46),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: hasTicket
+                          ? PatientHomeV8Style.blue
+                          : const Color(0xffdae4ff),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            action,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 13,
+                              height: 1.25,
+                              fontWeight: FontWeight.w700,
+                              color: hasTicket
+                                  ? Colors.white
+                                  : PatientDesign.primary,
+                            ),
+                          ),
+                        ),
+                        if (stacked || stubWidth >= 124) ...[
+                          const SizedBox(width: 5),
+                          Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 17,
+                            color: hasTicket
+                                ? Colors.white
+                                : PatientDesign.primary,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+            final content = stacked
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [details, stub],
+                  )
+                : IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(child: details),
+                        stub,
+                      ],
+                    ),
+                  );
+            final ink = Material(
+              color: Colors.white,
+              shape: stacked
+                  ? RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(
+                        color: _focused
+                            ? PatientHomeV8Style.blue
+                            : PatientDesign.border,
+                        width: _focused ? 2 : 1,
+                      ),
+                    )
+                  : null,
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: widget.onTap,
+                onHighlightChanged: highlight,
+                onFocusChange: (focused) => setState(() => _focused = focused),
+                focusColor: PatientHomeV8Style.blue.withValues(alpha: .12),
+                child: content,
+              ),
+            );
+            if (stacked) return ink;
             return PhysicalShape(
               clipper: PatientTicketClipper(stubWidth),
               color: Colors.white,
-              elevation: _focused ? 5 : 3,
-              shadowColor: const Color(0x441c4266),
+              elevation: _focused ? 2 : 1,
+              shadowColor: const Color(0x18172544),
               clipBehavior: Clip.antiAlias,
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: widget.onTap,
-                  onHighlightChanged: highlight,
-                  onFocusChange: (value) => setState(() => _focused = value),
-                  focusColor: accent.withValues(alpha: .12),
-                  child: CustomPaint(
-                    foregroundPainter: _TicketPerforation(
-                      stubWidth,
-                      accent,
-                      _focused,
-                    ),
-                    child: IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(
-                                16,
-                                14,
-                                12,
-                                14,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Container(
-                                        width: 44,
-                                        height: 44,
-                                        decoration: BoxDecoration(
-                                          color: accent.withValues(alpha: .12),
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                        child: Icon(
-                                          PatientServiceAccent.icon(category),
-                                          color: accent,
-                                          size: 27,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              label(clinic),
-                                              style: const TextStyle(
-                                                fontSize: 16,
-                                                height: 1.2,
-                                                fontWeight: FontWeight.w800,
-                                                color: PatientDesign.ink,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              metadata,
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                fontSize: 11.5,
-                                                height: 1.3,
-                                                color: PatientDesign.muted,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  if (largeText) ...[
-                                    personal,
-                                    const SizedBox(height: 10),
-                                    current,
-                                  ] else
-                                    Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Expanded(child: personal),
-                                        const SizedBox(width: 12),
-                                        Expanded(child: current),
-                                      ],
-                                    ),
-                                  if (!queue.live) ...[
-                                    const SizedBox(height: 7),
-                                    Text(
-                                      queue.freshness,
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        color: PatientDesign.muted,
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ),
-                          Container(
-                            width: stubWidth,
-                            padding: const EdgeInsets.fromLTRB(7, 14, 3, 14),
-                            color: accent.withValues(alpha: .07),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Tooltip(
-                                    message: 'Total check-in hari ini',
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.groups_rounded,
-                                          color: accent.withValues(alpha: .75),
-                                          size: 23,
-                                        ),
-                                        const SizedBox(height: 5),
-                                        QueueBValueMotion(
-                                          scope: scope,
-                                          value: summary?.checkedInTotal,
-                                          available:
-                                              summary?.checkedInTotal != null,
-                                          highlight: true,
-                                          highlightColor: accent,
-                                          child: Text(
-                                            '${summary?.checkedInTotal ?? '—'}',
-                                            key: ValueKey(
-                                              'patient-queue-total-${clinic['id']}',
-                                            ),
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              fontSize: 27,
-                                              height: 1.1,
-                                              fontWeight: FontWeight.w800,
-                                              color: accent,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 3),
-                                        const Text(
-                                          'Antrean',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: PatientDesign.muted,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                Icon(
-                                  Icons.chevron_right_rounded,
-                                  size: 18,
-                                  color: accent,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+              child: CustomPaint(
+                foregroundPainter: _TicketPerforation(
+                  stubWidth,
+                  PatientHomeV8Style.blue,
+                  _focused,
                 ),
+                child: ink,
               ),
             );
           },
@@ -567,20 +706,25 @@ class PatientHomeAppBarV8 extends StatelessWidget
     required this.height,
     required this.onProfile,
     required this.onNotifications,
+    this.maxWidth = 680,
   });
   final QueueApi api;
-  final double height;
+  final double height, maxWidth;
   final VoidCallback onProfile, onNotifications;
-  static double heightFor(BuildContext context) =>
-      math.max(60, MediaQuery.textScalerOf(context).scale(18) * 2.4 + 12);
+  static double heightFor(BuildContext context) => math.max(
+    64,
+    MediaQuery.textScalerOf(context).scale(16) *
+            (MediaQuery.textScalerOf(context).scale(12) > 18 ? 4 : 3) +
+        16,
+  );
   @override
   Size get preferredSize => Size.fromHeight(height);
   @override
   Widget build(BuildContext context) => Material(
-    color: PatientHomeV8Style.background,
+    color: Colors.white,
     child: Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680),
+        constraints: BoxConstraints(maxWidth: maxWidth),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: ListenableBuilder(
@@ -590,9 +734,13 @@ class PatientHomeAppBarV8 extends StatelessWidget
                 Expanded(
                   child: Semantics(
                     container: true,
-                    label: 'QueueB Hospital',
+                    label: AppBrand.name,
                     child: const ExcludeSemantics(
-                      child: QueueBBrand(compact: true),
+                      child: QueueBBrand(
+                        compact: true,
+                        fontSize: 16,
+                        logoSize: 30,
+                      ),
                     ),
                   ),
                 ),
@@ -603,6 +751,7 @@ class PatientHomeAppBarV8 extends StatelessWidget
                   icon: const Icon(
                     Icons.notifications_none_rounded,
                     color: PatientHomeV8Style.blue,
+                    size: 22,
                   ),
                 ),
                 IconButton(
@@ -628,123 +777,129 @@ class PatientHomeWelcomeV8 extends StatelessWidget {
     required this.now,
     required this.controller,
     required this.onSearch,
+    this.appointmentMode = false,
   });
   final String name;
   final DateTime now;
   final TextEditingController controller;
   final ValueChanged<String> onSearch;
+  final bool appointmentMode;
   @override
   Widget build(BuildContext context) {
-    final greeting = now.hour < 11
-        ? 'Selamat pagi,'
-        : now.hour < 15
-        ? 'Selamat siang,'
-        : now.hour < 18
-        ? 'Selamat sore,'
-        : 'Selamat malam,';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Stack(
-          children: [
-            Positioned.fill(
-              child: IgnorePointer(
-                child: ExcludeSemantics(
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: Opacity(
-                      opacity: .24,
-                      child: Image.asset(
-                        'assets/illustrations/patient_hospital.png',
-                        width: 230,
-                        fit: BoxFit.contain,
-                        cacheWidth: 640,
+        Material(
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: const BorderSide(color: PatientDesign.border),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Halo, ${name.trim().isEmpty ? 'Pasien' : name.trim()}',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          height: 1.25,
+                          fontWeight: FontWeight.w700,
+                          color: PatientDesign.ink,
+                        ),
                       ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        AppBrand.name,
+                        style: TextStyle(
+                          fontSize: 13,
+                          height: 1.35,
+                          color: PatientDesign.muted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                ExcludeSemantics(
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: PatientDesign.soft,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.medical_services_outlined,
+                      size: 24,
+                      color: PatientHomeV8Style.blue,
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
-            Padding(
-              padding: const EdgeInsets.only(top: 8, bottom: 18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    greeting,
-                    style: const TextStyle(
-                      fontSize: 23,
-                      height: 1.2,
-                      fontWeight: FontWeight.w800,
-                      color: PatientDesign.ink,
-                    ),
-                  ),
-                  Text(
-                    name.trim().isEmpty ? 'Pasien' : name,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      height: 1.2,
-                      fontWeight: FontWeight.w800,
-                      color: PatientDesign.ink,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Semoga harimu sehat dan lancar',
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.4,
-                      color: PatientDesign.muted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(17),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x07173b66),
-                blurRadius: 10,
-                offset: Offset(0, 3),
-              ),
-            ],
           ),
-          child: TextField(
-            controller: controller,
-            onChanged: onSearch,
-            decoration: InputDecoration(
-              hintText: 'Cari layanan, poli, atau informasi...',
-              prefixIcon: const Icon(
-                Icons.search_rounded,
-                color: PatientDesign.muted,
-              ),
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(17),
-                borderSide: const BorderSide(color: PatientDesign.border),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(17),
-                borderSide: const BorderSide(color: PatientDesign.border),
-              ),
-              suffixIcon: controller.text.isEmpty
-                  ? null
-                  : IconButton(
-                      tooltip: 'Bersihkan pencarian',
-                      icon: const Icon(Icons.close),
-                      onPressed: () {
-                        controller.clear();
-                        onSearch('');
-                      },
-                    ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          onChanged: onSearch,
+          style: const TextStyle(fontSize: 14, color: PatientDesign.ink),
+          decoration: InputDecoration(
+            isDense: true,
+            constraints: const BoxConstraints(minHeight: 48),
+            hintText: appointmentMode
+                ? 'Cari nama dokter atau spesialisasi...'
+                : 'Cari layanan, poli, atau dokter...',
+            hintStyle: const TextStyle(
+              fontSize: 14,
+              color: PatientDesign.muted,
             ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 13,
+            ),
+            prefixIconConstraints: const BoxConstraints(
+              minWidth: 44,
+              minHeight: 48,
+            ),
+            prefixIcon: const Icon(
+              Icons.search_rounded,
+              size: 22,
+              color: PatientDesign.muted,
+            ),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: PatientDesign.border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: PatientDesign.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(
+                color: PatientDesign.primary,
+                width: 1.5,
+              ),
+            ),
+            suffixIcon: controller.text.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: 'Bersihkan pencarian',
+                    icon: const Icon(Icons.close),
+                    onPressed: () {
+                      controller.clear();
+                      onSearch('');
+                    },
+                  ),
           ),
         ),
       ],
@@ -769,6 +924,10 @@ class PatientHomeVisitV8 extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final slot = object(appointment?['slotPraktik']);
+    final day =
+        '${ticket?['tanggalPelayanan'] ?? ticket?['tanggalAntrean'] ?? ''}';
+    final service = label(object(ticket?['layanan']));
+    final number = '${ticket?['nomorAntrean'] ?? ''}'.trim();
     final when = ticket == null
         ? loading
               ? 'Memuat kunjungan…'
@@ -776,135 +935,262 @@ class PatientHomeVisitV8 extends StatelessWidget {
               ? 'Kunjungan belum dapat dimuat.'
               : 'Belum ada kunjungan mendatang.'
         : [
-            patientDate(
-              '${ticket!['tanggalPelayanan'] ?? ticket!['tanggalAntrean']}',
-            ),
-            if (slot['mulaiPada'] != null) patientTime(slot, config),
+            dateOnly(day) == config.today
+                ? 'Hari ini'
+                : patientCompactDate(day),
+            if (slot['mulaiPada'] != null)
+              '${patientTime(slot, config)} ${patientHomeTimeZone(config.serviceTimeZone)}',
+            if (number.isNotEmpty) 'No. $number',
           ].join(' · ');
     final status = ticket == null
         ? null
         : reservationStatus('${ticket!['status']}');
     return Material(
       key: const ValueKey('patient-nearest-visit'),
-      color: Colors.white.withValues(alpha: .88),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: const BorderSide(color: Colors.white),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: LayoutBuilder(
-          builder: (context, bounds) {
-            final detail = TextButton(
-              onPressed: onOpen,
-              style: TextButton.styleFrom(
-                foregroundColor: PatientHomeV8Style.blue,
-                backgroundColor: const Color(0xffe5f0ff),
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Flexible(child: Text('Lihat Detail')),
-                  Icon(Icons.chevron_right, size: 17),
-                ],
-              ),
-            );
-            final narrow =
-                bounds.maxWidth < 280 ||
-                MediaQuery.textScalerOf(context).scale(12) > 17;
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      color: const Color(0xffdbe5ff),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onOpen,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Container(
-                  width: 42,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: const Color(0xffe6f0ff),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.calendar_month_outlined,
-                    color: PatientHomeV8Style.blue,
+                ExcludeSemantics(
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.notifications_active_outlined,
+                      color: PatientHomeV8Style.blue,
+                      size: 22,
+                    ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Kunjungan Terdekat',
-                        style: TextStyle(
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 2,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          const Text(
+                            'KUNJUNGAN TERDEKAT',
+                            style: TextStyle(
+                              fontSize: 11,
+                              height: 1.3,
+                              fontWeight: FontWeight.w700,
+                              color: PatientHomeV8Style.blue,
+                            ),
+                          ),
+                          if (ticket != null &&
+                              service.isNotEmpty &&
+                              service != '—')
+                            Text(
+                              service,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                height: 1.3,
+                                fontWeight: FontWeight.w600,
+                                color: PatientDesign.ink,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(text: when),
+                            if (status != null)
+                              TextSpan(
+                                text: ' · $status',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: PatientDesign.statusInk(
+                                    '${ticket!['status']}',
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        style: const TextStyle(
                           fontSize: 12,
-                          fontWeight: FontWeight.w800,
+                          height: 1.35,
                           color: PatientDesign.ink,
                         ),
                       ),
-                      if (ticket != null) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          label(object(ticket!['layanan'])),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: PatientDesign.ink,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 3),
-                      Text(
-                        when,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          height: 1.3,
-                          color: PatientDesign.muted,
-                        ),
-                      ),
-                      if (status != null && narrow) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          status,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: PatientDesign.statusInk(
-                              '${ticket!['status']}',
-                            ),
-                          ),
-                        ),
-                      ],
-                      if (ticket != null && narrow)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 5),
-                          child: detail,
-                        ),
                     ],
                   ),
                 ),
-                if (ticket != null && !narrow) ...[
-                  const SizedBox(width: 8),
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      detail,
-                      if (status != null)
-                        Text(
-                          status,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: PatientDesign.statusInk(
-                              '${ticket!['status']}',
-                            ),
-                          ),
-                        ),
-                    ],
+                if (onOpen != null)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 6),
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      color: PatientHomeV8Style.blue,
+                      size: 22,
+                    ),
                   ),
-                ],
               ],
-            );
-          },
+            ),
+          ),
         ),
       ),
     );
   }
 }
+
+class PatientHomeListHeading extends StatelessWidget {
+  const PatientHomeListHeading({
+    super.key,
+    required this.title,
+    this.caption,
+    this.live = false,
+    this.showLive = false,
+  });
+  final String title;
+  final String? caption;
+  final bool live, showLive;
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+    spacing: 10,
+    runSpacing: 8,
+    crossAxisAlignment: WrapCrossAlignment.center,
+    children: [
+      Text(
+        title,
+        style: const TextStyle(
+          fontSize: 16,
+          height: 1.3,
+          fontWeight: FontWeight.w600,
+          color: PatientDesign.ink,
+        ),
+      ),
+      if (caption != null)
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: const Color(0xffe4ebff),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            caption!,
+            style: const TextStyle(
+              fontSize: 11,
+              height: 1.3,
+              color: PatientDesign.ink,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      if (showLive)
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              live ? Icons.circle : Icons.sync_rounded,
+              size: live ? 7 : 14,
+              color: live
+                  ? PatientDesign.statusInk('DILAYANI')
+                  : PatientDesign.muted,
+            ),
+            const SizedBox(width: 5),
+            Flexible(
+              child: Text(
+                live ? 'Live Update' : 'Pembaruan berkala',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: live
+                      ? PatientDesign.statusInk('DILAYANI')
+                      : PatientDesign.muted,
+                ),
+              ),
+            ),
+          ],
+        ),
+    ],
+  );
+}
+
+class PatientHomeOtherSchedules extends StatelessWidget {
+  const PatientHomeOtherSchedules({super.key, this.onOpen});
+  final VoidCallback? onOpen;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: PatientDesign.soft,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    clipBehavior: Clip.antiAlias,
+    child: InkWell(
+      onTap: onOpen,
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(top: 2),
+              child: Icon(
+                Icons.event_available_outlined,
+                color: PatientHomeV8Style.blue,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Cari jadwal di hari lain',
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.35,
+                      fontWeight: FontWeight.w600,
+                      color: PatientDesign.ink,
+                    ),
+                  ),
+                  SizedBox(height: 3),
+                  Text(
+                    'Pilih dokter dan tanggal praktik.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.4,
+                      color: PatientDesign.muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.arrow_forward_rounded,
+              size: 18,
+              color: PatientHomeV8Style.blue,
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+String patientHomeTimeZone(String zone) => switch (zone) {
+  'Asia/Jakarta' => 'WIB',
+  'Asia/Makassar' => 'WITA',
+  'Asia/Jayapura' => 'WIT',
+  _ => zone,
+};

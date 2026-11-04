@@ -1,4 +1,4 @@
-# KELOMPOK B - Sistem Manajemen Antrean Digital
+# Kliinik Kelompok B - Sistem Manajemen Antrean Digital
 
 Repository utama Capstone Project STSI4440
 Program Studi Sistem Informasi
@@ -6,11 +6,11 @@ Universitas Terbuka.
 
 ## Status
 
-Backend MVP QueueB Hospital selesai. Aplikasi Flutter di `apps/client` menyediakan portal PASIEN (USER), ADMIN, PETUGAS, DOKTER, dan Public Display, termasuk tiket digital, cetak, dan unduh PDF.
+Backend MVP Kliinik Kelompok B selesai. Aplikasi Flutter di `apps/client` menyediakan portal PASIEN (USER), ADMIN, PETUGAS, DOKTER, dan Public Display, termasuk tiket digital, cetak, dan unduh PDF.
 
 Kontrak API: [Panduan Integrasi Backend](docs/backend/API_INTEGRATION_GUIDE.md).
 Menjalankan aplikasi: [Panduan Instalasi Lokal](docs/setup/LOCAL_INSTALLATION_GUIDE.md).
-Acuan tampilan: [Panduan UI/UX QueueB](docs/frontend/QUEUEB_UI_UX_GUIDELINES.md).
+Acuan tampilan: [Panduan UI/UX Kliinik Kelompok B](docs/frontend/QUEUEB_UI_UX_GUIDELINES.md).
 
 ## Tujuan
 
